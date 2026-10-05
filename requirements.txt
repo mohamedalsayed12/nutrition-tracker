@@ -1,0 +1,13 @@
+Flask
+Flask-Bcrypt
+Flask-Login
+Flask-SQLAlchemy
+Flask-WTF
+healthsciencecalculator
+PySimpleGUI
+python-dotenv
+requests
+SQLAlchemy
+usda-fdc
+WTForms
+bcrypt

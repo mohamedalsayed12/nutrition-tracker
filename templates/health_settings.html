@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Medical conditions settings{% endblock %}
+{% block content %}
+<style>
+  .health-settings { max-width: 900px; margin: 0 auto; }
+  .health-settings fieldset { margin: 18px 0; padding: 16px; }
+  .health-settings label { display: block; margin: 10px 0; }
+  .health-settings input[type="number"] { max-width: 180px; padding: 6px; }
+  .health-settings table { width: 100%; border-collapse: collapse; }
+  .health-settings th, .health-settings td { text-align: left; padding: 8px; border-bottom: 1px solid #777; }
+  .health-settings .table-wrap { overflow-x: auto; }
+</style>
+
+<div class="health-settings">
+  <h1>Medical conditions settings</h1>
+  <p>These settings use your UserInfo age {{ age }} and sex {{ sex }}. Update UserInfo if either has changed.</p>
+  <form method="post">
+    <input type="hidden" name="_health_token" value="{{ token }}">
+
+    <!-- ##Pregnancy uses published age-specific micronutrient reference amounts. -->
+    <fieldset>
+      <legend>Conditions</legend>
+      <label><input type="checkbox" name="conditions" value="pregnancy" {% if 'pregnancy' in selected %}checked{% endif %}> Pregnant</label>
+      <label>Trimester
+        <select name="trimester">
+          <option value="">Choose if pregnant</option>
+          {% for number in (1, 2, 3) %}<option value="{{ number }}" {% if trimester|string == number|string %}selected{% endif %}>{{ number }}</option>{% endfor %}
+        </select>
+      </label>
+      <p>Pregnancy updates micronutrient targets using <a href="https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/">NIH reference amounts</a>. Those micronutrient amounts do not vary by trimester here. It does not set a calorie goal automatically; enter one below if you have a care-plan target.</p>
+      <label><input type="checkbox" name="conditions" value="diabetes" {% if 'diabetes' in selected %}checked{% endif %}> Diabetes</label>
+      <p>Diabetes has no single carbohydrate target for everyone. Use your care-plan amount below, following <a href="https://diabetesjournals.org/care/article/49/Supplement_1/S89/163932">ADA individualized nutrition guidance</a>.</p>
+      <label><input type="checkbox" name="conditions" value="ibs" {% if 'ibs' in selected %}checked{% endif %}> IBS</label>
+      <p>IBS does not automatically change vitamin or mineral targets. A clinician or dietitian may suggest food changes based on symptoms; <a href="https://www.niddk.nih.gov/health-information/digestive-diseases/irritable-bowel-syndrome/eating-diet-nutrition">NIDDK explains the dietary options</a>.</p>
+    </fieldset>
+
+    <!-- ##Optional care-plan amounts replace the calculator's corresponding targets. -->
+    <fieldset>
+      <legend>Optional care-plan targets</legend>
+      <label>Daily calories (kcal) <input type="number" name="custom_calories" min="500" max="10000" step="0.1" value="{{ custom_calories or '' }}"></label>
+      <label>Daily carbohydrates (g) <input type="number" name="custom_carbs" min="0.1" max="1500" step="0.1" value="{{ custom_carbs or '' }}"></label>
+      <p>Leave a field blank to use the usual calculator target. During pregnancy, a blank calorie field means no calorie target is shown.</p>
+    </fieldset>
+
+    <details>
+      <summary>Adjust individual micronutrient targets (optional)</summary>
+      <p>Enter only amounts from your personal care plan. A blank field uses the age and condition reference amount. Sodium is a limit.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Nutrient</th><th scope="col">Reference amount</th><th scope="col">Your amount</th></tr></thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <th scope="row">{{ row.name }}{% if row.direction == 'maximum' %} (limit){% endif %}</th>
+                <td>{{ row.target }} {{ row.unit }}</td>
+                <td><input type="number" name="micro_{{ row.index }}" min="0.001" max="1000000" step="any" value="{{ row.override }}" aria-label="Custom {{ row.name }} target in {{ row.unit }}"></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+    <button type="submit">Save medical conditions settings</button>
+  </form>
+  <p><a href="{{ url_for('home_page') }}">Back to homepage</a></p>
+</div>
+{% endblock %}
