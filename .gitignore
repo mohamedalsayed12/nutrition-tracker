@@ -1,0 +1,8 @@
+.env
+food_cache.sqlite3
+instance/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.idea/

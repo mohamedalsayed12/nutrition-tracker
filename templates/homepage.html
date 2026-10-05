@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Homepage{% endblock %}
+
+{% block header %}
+  <h1>Meals Log</h1>
+{% endblock %}
+
+{% block content %}
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #000000, #000000, rgb(246 0 0));
+      color: white;
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    nav, .content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    nav a {
+      color: rgb(27, 27, 236);
+    }
+
+    .content header {
+      text-align: center;
+    }
+
+    .content form, .content > p {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 16px rgb(255 255 255 / 0.2);
+      border-radius: 12px;
+      padding: 25px;
+    }
+
+    .content label {
+      display: block;
+      margin: 10px 0;
+      font-weight: bold;
+    }
+
+    .content input, .content button {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 10px;
+      border: 0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .content input {
+      margin-top: 5px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      outline: none;
+    }
+
+    .content input:focus {
+      border: 2px solid #ffcc70;
+    }
+
+    .content button {
+      margin-top: 15px;
+      background: linear-gradient(90deg, #ff8c00, #ff3b3b);
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .content button:hover {
+      background: linear-gradient(90deg, #ff3b3b, #ff8c00);
+    }
+
+    /* ##Keep the new delete controls compact inside food and activity logs. */
+    .content form.delete-entry {
+      background: none;
+      box-shadow: none;
+      padding: 0;
+      margin: 10px 0 20px;
+    }
+
+    .content form.delete-entry button {
+      width: auto;
+      margin: 0;
+      background: #9f2525;
+    }
+
+    .npc-result {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 12px 0;
+    }
+
+    .micronutrient-targets th, .micronutrient-targets td {
+      padding: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    @media (max-width: 600px) {
+      nav, .content {
+        padding: 0 15px;
+      }
+    }
+  </style>
+
+  <!-- ##Show the logging day using the user's browser time zone. -->
+  <h1>Logging for <time data-local-day datetime="{{ logging_day.isoformat() }}">{{ logging_day.strftime('%A, %d %B %Y') }}</time></h1>
+
+  <!-- ##Show the UserInfo calorie and macro targets above the meal inputs. -->
+  <p class="target">
+    {% if calorie_target is not none %}
+      <strong>Daily calorie target: {{ calorie_target }} kcal</strong><br>
+      {% if nutrition_targets %}
+        <span>Protein: {{ nutrition_targets.protein_min }}–{{ nutrition_targets.protein_max }} g/day</span><br>
+        <span>Carbohydrates: {{ nutrition_targets.carbs }} g/day</span><br>
+      {% endif %}
+      <a href="{{ url_for('user_info_page') }}">Recalculate your target</a>
+    {% else %}
+      {% if health_preferences and 'pregnancy' in health_preferences.conditions %}
+        <strong>Pregnancy calorie target not set.</strong><br>
+        <a href="{{ url_for('health_settings') }}">Enter your care-plan calorie target</a>
+      {% else %}
+        <strong>No daily calorie target set yet.</strong><br>
+        <a href="{{ url_for('user_info_page') }}">Calculate your target</a>
+      {% endif %}
+    {% endif %}
+  </p>
+  {% if nutrition_targets %}
+    <p><a href="{{ url_for('health_settings') }}">Medical conditions settings (pregnancy, IBS, diabetes)</a>
+      {% if health_preferences and health_preferences.conditions %} — {{ health_preferences.conditions|join(', ') }}{% endif %}
+    </p>
+  {% endif %}
+
+  <!-- ##Show personal micronutrient targets and today's progress from logged foods. -->
+  {% if nutrition_targets %}
+    {% with micronutrients=nutrition_targets.micronutrients, target_age=nutrition_targets.age, target_sex=nutrition_targets.sex, pregnant=(health_preferences and 'pregnancy' in health_preferences.conditions) %}
+      {% include '_micronutrient_targets.html' %}
+    {% endwith %}
+    <section class="micronutrient-targets" style="background: rgba(255, 255, 255, 0.1); padding: 25px; border-radius: 12px; margin: 20px auto; max-width: 800px;">
+      <h2>Micronutrient progress today</h2>
+      <p>Amounts below use only foods logged today. A food may omit nutrients from its data, so these are estimates from reported amounts, not a test for a deficiency.</p>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead><tr><th scope="col">Nutrient</th><th scope="col">Logged</th><th scope="col">Needed or room left</th></tr></thead>
+          <tbody>
+            {% for nutrient in micronutrients_remaining %}
+              <tr>
+                <th scope="row">{{ nutrient.name }}{% if nutrient.limit %} (limit){% endif %}</th>
+                <td>{% if nutrient.logged is none %}Not reported{% else %}{{ nutrient.logged }} {{ nutrient.unit }}{% if nutrient.partial %} (partial){% endif %}{% endif %}</td>
+                <td>{% if nutrient.remaining is none %}Unknown{% else %}{{ nutrient.remaining }} {{ nutrient.unit }}{% if nutrient.limit %} room left{% endif %}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+
+  <!-- ##Let users find a USDA food for each meal and enter the grams eaten. -->
+  <form method="post">
+    <input type="hidden" name="_submission_token" value="{{ submission_token }}">
+    <div class="meal">
+      <label>Breakfast <input name="breakfast" list="breakfast-suggestions" data-food-search autocomplete="off"></label>
+      <datalist id="breakfast-suggestions"></datalist>
+      <label class="grams-label" style="display: none;">Amount eaten (grams)
+        <input type="number" name="breakfast_grams" min="0" step="0.1" disabled>
+      </label>
+    </div>
+    <div class="meal">
+      <label>Lunch <input name="lunch" list="lunch-suggestions" data-food-search autocomplete="off"></label>
+      <datalist id="lunch-suggestions"></datalist>
+      <label class="grams-label" style="display: none;">Amount eaten (grams)
+        <input type="number" name="lunch_grams" min="0" step="0.1" disabled>
+      </label>
+    </div>
+    <div class="meal">
+      <label>Dinner <input name="dinner" list="dinner-suggestions" data-food-search autocomplete="off"></label>
+      <datalist id="dinner-suggestions"></datalist>
+      <label class="grams-label" style="display: none;">Amount eaten (grams)
+        <input type="number" name="dinner_grams" min="0" step="0.1" disabled>
+      </label>
+    </div>
+    <label>Exercise
+  <input name="activity" id="activity" list="exercise-suggestions" autocomplete="off">
+</label>
+<datalist id="exercise-suggestions"></datalist>
+    <button type="submit">Save</button>
+  </form>
+
+  {% if values %}
+    <p>Breakfast: {{ values.breakfast }}</p>
+    <p>Lunch: {{ values.lunch }}</p>
+    <p>Dinner: {{ values.dinner }}</p>
+    <p>Exercise: {{ values.activity }}</p>
+  {% endif %}
+
+  {% if error %}
+    <p role="alert">{{ error }}</p>
+  {% endif %}
+
+  <!-- ##Group foods by meal and day, show their nutrients and NPC score, and allow deletion. -->
+  <h2>Your food log</h2>
+  <p>NPC rates reported micronutrients per 100 kcal against your UserInfo targets. Each target except sodium contributes equally and is capped at twice the density needed for your calorie target. Missing nutrient data earn no points. This is a micronutrient rating, not an overall health rating.</p>
+  {% for group in meal_groups %}
+    <section>
+      <h3><time data-local-day datetime="{{ group.date.isoformat() }}">{{ group.date.strftime('%A, %d %B %Y') }}</time> — {{ group.meal|title }}</h3>
+      {% for log in group.foods %}
+        <h4>{{ log.food_name }} ({{ log.grams }} g)</h4>
+        <p><a href="https://fdc.nal.usda.gov/food-details/{{ log.fdc_id }}/nutrients" target="_blank" rel="noopener noreferrer">Check source nutrition (FDC {{ log.fdc_id }})</a></p>
+        <ul>
+          {% for nutrient in log.nutrients %}
+            <li>{{ nutrient.name }}: {{ nutrient.eaten }} {{ nutrient.unit }}</li>
+          {% endfor %}
+        </ul>
+        <div class="npc-result">
+          {% if log.npc_result.score is not none %}
+            <strong>NPC micronutrient density: {{ log.npc_result.score }}/100</strong>
+          {% else %}
+            <strong>NPC rating unavailable</strong>
+          {% endif %}
+          <ul>
+            {% for reason in log.npc_result.reasons %}<li>{{ reason }}</li>{% endfor %}
+          </ul>
+        </div>
+        <form class="delete-entry" method="post" action="{{ url_for('delete_food_log', log_id=log.id) }}" onsubmit="return confirm('Delete this food entry?')">
+          <input type="hidden" name="_delete_token" value="{{ delete_token }}">
+          <button type="submit" aria-label="Delete {{ log.food_name }} from {{ group.meal }}">Delete</button>
+        </form>
+      {% endfor %}
+    </section>
+  {% else %}
+    <p>No foods logged yet.</p>
+  {% endfor %}
+
+  <!-- ##Show saved exercise entries with an individual delete control. -->
+  <h2>Your activity log</h2>
+  {% for log in activity_logs %}
+    <section>
+      <p><time data-local-day datetime="{{ log.local_date.isoformat() }}">{{ log.local_date.strftime('%A, %d %B %Y') }}</time> — {{ log.activity }}</p>
+      <form class="delete-entry" method="post" action="{{ url_for('delete_activity_log', log_id=log.id) }}" onsubmit="return confirm('Delete this activity entry?')">
+        <input type="hidden" name="_delete_token" value="{{ delete_token }}">
+        <button type="submit" aria-label="Delete {{ log.activity }}">Delete</button>
+      </form>
+    </section>
+  {% else %}
+    <p>No activities logged yet.</p>
+  {% endfor %}
+
+  <script>
+    // ##Keep the server's meal day in sync with the browser's local time zone.
+    const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const savedTimeZone = document.cookie.split('; ').find((part) => part.startsWith('tracker_timezone='))?.split('=')[1];
+    if (savedTimeZone !== encodeURIComponent(browserTimeZone)) {
+      document.cookie = `tracker_timezone=${encodeURIComponent(browserTimeZone)}; Path=/; SameSite=Lax`;
+      if (document.cookie.split('; ').includes(`tracker_timezone=${encodeURIComponent(browserTimeZone)}`)) {
+        window.location.reload();
+      }
+    }
+    // ##Format visible logging dates in the browser's local date style.
+    const localDateFormat = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    document.querySelectorAll('[data-local-day]').forEach((element) => {
+      element.textContent = localDateFormat.format(new Date(`${element.dateTime}T12:00:00`));
+    });
+
+    // ##Load USDA food suggestions with their brand and source labels.
+    const foodSearchUrl = {{ url_for('food_suggestions')|tojson }};
+    document.querySelectorAll('[data-food-search]').forEach((input) => {
+      const suggestions = document.getElementById(input.getAttribute('list'));
+      let timer;
+      let latestSearch = 0;
+
+      input.addEventListener('input', () => {
+        clearTimeout(timer);
+        const query = input.value.trim();
+        const searchNumber = ++latestSearch;
+        suggestions.replaceChildren();
+        if (query.length < 2) return;
+        if (/\[FDC:\d+\]$/.test(query)) return;
+
+        timer = setTimeout(async () => {
+          try {
+            const response = await fetch(`${foodSearchUrl}?q=${encodeURIComponent(query)}`);
+            if (!response.ok) return;
+            const data = await response.json();
+            if (searchNumber !== latestSearch) return;
+            for (const food of data.foods) {
+              const option = document.createElement('option');
+              const brand = food.brand_name ? ` | Brand: ${food.brand_name}` : '';
+              option.value = `${food.description}${brand} | Source: ${food.data_type} [FDC:${food.fdc_id}]`;
+              suggestions.appendChild(option);
+            }
+          } catch (error) {
+            suggestions.replaceChildren();
+          }
+        }, 350);
+      });
+    });
+    document.querySelectorAll('.meal').forEach((meal) => {
+      const food = meal.querySelector('[data-food-search]');
+      const gramsLabel = meal.querySelector('.grams-label');
+      const grams = gramsLabel.querySelector('input');
+      // ##Ask for grams only after the user has entered a food selection.
+      function updateGrams() {
+        const hasFood = food.value.trim() !== '';
+        gramsLabel.style.display = hasFood ? 'block' : 'none';
+        grams.disabled = !hasFood;
+        grams.required = hasFood;
+        if (!hasFood) grams.value = '';
+      }
+
+      food.addEventListener('input', updateGrams);
+      updateGrams();
+    });
+  const activityInput = document.getElementById("activity");
+const exerciseSuggestions = document.getElementById("exercise-suggestions");
+let exerciseTimer;
+
+activityInput.addEventListener("input", () => {
+  clearTimeout(exerciseTimer);
+  exerciseSuggestions.replaceChildren();
+
+  const query = activityInput.value.trim();
+  if (query.length < 2) return;
+
+  exerciseTimer = setTimeout(async () => {
+    try {
+      const response = await fetch(
+        `/api/exercises?q=${encodeURIComponent(query)}`
+      );
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (activityInput.value.trim() !== query) return;
+
+      for (const name of data.exercises) {
+        const option = document.createElement("option");
+        option.value = name;
+        exerciseSuggestions.appendChild(option);
+      }
+    } catch (error) {
+      exerciseSuggestions.replaceChildren();
+    }
+  }, 350);
+});</script>
+{% endblock %}
