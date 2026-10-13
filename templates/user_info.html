@@ -1,47 +1,3 @@
-{% raw %}
-<!--{% extends 'base.html' %}-->
-
-<!--{% block title %}User Info{% endblock %}-->
-
-<!--{% block header %}<h1>BMR and TDEE Calculator</h1>{% endblock %}-->
-
-<!--{% block content %}-->
-<!--<form method="post" action="{{ url_for('user_info_page') }}">-->
-<!--  <label for="age">Age (years)</label>-->
-<!--  <input id="age" name="age" type="number" min="1" required value="{{ values.get('age', '') }}">-->
-
-<!--  <label for="height">Height (cm)</label>-->
-<!--  <input id="height" name="height" type="number" min="0.1" step="any" required value="{{ values.get('height', '') }}">-->
-
-<!--  <label for="weight">Weight (kg)</label>-->
-<!--  <input id="weight" name="weight" type="number" min="0.1" step="any" required value="{{ values.get('weight', '') }}">-->
-
-<!--  <label for="gender">Sex for BMR estimate</label>-->
-<!--  <select id="gender" name="gender" required>-->
-<!--    <option value="male" {% if values.get('gender') == 'male' %}selected{% endif %}>Male</option>-->
-<!--    <option value="female" {% if values.get('gender') == 'female' %}selected{% endif %}>Female</option>-->
-<!--  </select>-->
-
-<!--  <label for="activity_level">Activity level</label>-->
-<!--  <select id="activity_level" name="activity_level" required>-->
-<!--    {% for level in ['sedentary', 'lightly active', 'moderately active', 'very active', 'extra active'] %}-->
-<!--      <option value="{{ level }}" {% if values.get('activity_level') == level %}selected{% endif %}>{{ level|title }}</option>-->
-<!--    {% endfor %}-->
-<!--  </select>-->
-
-<!--  <button type="submit">Calculate</button>-->
-<!--</form>-->
-
-<!--{% if error %}<p role="alert">{{ error }}</p>{% endif %}-->
-<!--{% if bmr is not none and tdee is not none %}-->
-<!--  <p>Estimated BMR: {{ '%.1f'|format(bmr) }} calories/day</p>-->
-<!--  <p>Estimated TDEE: {{ '%.1f'|format(tdee) }} calories/day</p>-->
-<!--{% endif %}-->
-<!--{% endblock %}-->
-{% endraw %}
-
-
-
 {% extends 'base.html' %}
 
 {% block title %}Home - My Calorie Tracker{% endblock %}
@@ -138,7 +94,7 @@ button:hover {
     text-decoration: underline;
 }
 
-/* Responsive Design */
+
 @media (max-width: 600px) {
     .form-container, .result-container {
         padding: 15px;
@@ -179,6 +135,7 @@ button:hover {
 
             <div class="radio-group">
                 <label>Activity Level:</label>
+                <p>Choose your usual activity, including your normal workouts. You can mark an additional workout as extra when logging it.</p>
                 <label>
                     <input type="radio" name="activity_level" value="sedentary" required> Sedentary
                 </label>
@@ -198,7 +155,6 @@ button:hover {
 
             </div><br><br>
 
-            <!-- ##Use the selected weight goal when calculating daily calorie and macro targets. -->
             <div class="radio-group">
                 <label>Goal:</label>
                 <label>
@@ -217,7 +173,6 @@ button:hover {
     </div>
 
 
-    <!-- ##Show the saved calorie, macro, and micronutrient results after calculation. -->
     {% if error %}<p role="alert">{{ error }}</p>{% endif %}
     {% if calories_for_goal is not none %}
     <div class="result-container">
@@ -226,10 +181,18 @@ button:hover {
             <h2>Your BMR: {{ bmr }} kcal/day</h2>
             <h2>Your TDEE: {{ tdee }} kcal/day</h2>
             <h2>{% if pregnancy_active %}Baseline calorie estimate{% else %}Calories for your goal{% endif %}: {{ calories_for_goal }} kcal/day</h2>
+            {% if custom_macros %}
+            <h2>Estimated protein: {{ custom_macros.protein }} g/day{% if custom_macros.protein_overridden %} (personal amount){% endif %}</h2>
+            <h2>Estimated carbohydrates: {{ custom_macros.carbs }} g/day{% if custom_macros.carbs_overridden %} (personal amount){% endif %}</h2>
+            <h2>Estimated fat: {{ custom_macros.fat }} g/day{% if custom_macros.fat_overridden %} (personal amount){% endif %}</h2>
+            {% else %}
             <h2>Estimated protein range: {{protein_min}} to {{protein_max}} g/day</h2>
             <h2>Estimated carbohydrates: {{carbs}} g/day</h2>
+            {% if fat_range %}<h2>Estimated fat range: {{ fat_range[0] }} to {{ fat_range[1] }} g/day</h2>{% endif %}
+            {% endif %}
             <a href="{{ url_for('home_page') }}">Go back</a>
-            <a href="{{ url_for('health_settings') }}">Adjust medical conditions and targets</a>
+            <a href="{{ url_for('macro_split_settings') }}">Choose your macro split</a>
+            <a href="{{ url_for('health_settings') }}">Medical condition setting</a>
         </center>
 
     </div>

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Medical conditions settings{% endblock %}
+{% block title %}Medical condition setting{% endblock %}
 {% block content %}
 <style>
   .health-settings { max-width: 900px; margin: 0 auto; }
@@ -13,14 +13,13 @@
 </style>
 
 <div class="health-settings">
-  <h1>Medical conditions settings</h1>
+  <h1>Medical condition setting</h1>
   <p>These settings use your UserInfo age {{ age }} and sex {{ sex }}. Update UserInfo if either has changed.</p>
   <form method="post">
     <input type="hidden" name="_health_token" value="{{ token }}">
 
-    <!-- ##Pregnancy uses published age-specific micronutrient reference amounts. -->
     <fieldset>
-      <legend>Conditions</legend>
+      <legend>Conditions and life stages</legend>
       <label><input type="checkbox" name="conditions" value="pregnancy" {% if 'pregnancy' in selected %}checked{% endif %}> Pregnant</label>
       <label>Trimester
         <select name="trimester">
@@ -30,17 +29,32 @@
       </label>
       <p>Pregnancy updates micronutrient targets using <a href="https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/">NIH reference amounts</a>. Those micronutrient amounts do not vary by trimester here. It does not set a calorie goal automatically; enter one below if you have a care-plan target.</p>
       <label><input type="checkbox" name="conditions" value="diabetes" {% if 'diabetes' in selected %}checked{% endif %}> Diabetes</label>
-      <p>Diabetes has no single carbohydrate target for everyone. Use your care-plan amount below, following <a href="https://diabetesjournals.org/care/article/49/Supplement_1/S89/163932">ADA individualized nutrition guidance</a>.</p>
+      <p>The <a href="https://diabetesjournals.org/care/article/49/Supplement_1/S89/163932">2026 ADA Standards</a> recommend an individualized eating plan, not one carbohydrate, protein, or fat percentage for everyone with diabetes. Monitoring carbohydrate intake can help with glucose goals. The tracker also shows dietary fiber against the ADA's 14 g per 1,000 kcal recommendation when a calorie target is set.</p>
       <label><input type="checkbox" name="conditions" value="ibs" {% if 'ibs' in selected %}checked{% endif %}> IBS</label>
-      <p>IBS does not automatically change vitamin or mineral targets. A clinician or dietitian may suggest food changes based on symptoms; <a href="https://www.niddk.nih.gov/health-information/digestive-diseases/irritable-bowel-syndrome/eating-diet-nutrition">NIDDK explains the dietary options</a>.</p>
+      <p><a href="https://www.niddk.nih.gov/health-information/digestive-diseases/irritable-bowel-syndrome/eating-diet-nutrition">NIDDK guidance</a> focuses on symptom-specific food choices, including soluble fiber and a time-limited low-FODMAP trial when recommended. IBS has no standard carb, protein, or fat split. USDA total fiber data does not identify soluble fiber or FODMAP amounts, so the tracker cannot rate foods as IBS-safe.</p>
+      <label><input type="checkbox" name="conditions" value="menstruation" {% if 'menstruation' in selected %}checked{% endif %}> Periods / menstruation (I have menstrual cycles)</label>
+      <p>This adds an iron and vitamin C focus to your micronutrient progress throughout your cycle. It keeps your age/sex reference amounts and personal overrides. Select pregnancy instead if pregnant.</p>
     </fieldset>
 
-    <!-- ##Optional care-plan amounts replace the calculator's corresponding targets. -->
+    {% if condition_guidance %}
+      <section aria-labelledby="micro-focus-heading">
+        <h2 id="micro-focus-heading">Micronutrients for your selections</h2>
+        {% for profile in condition_guidance %}
+          <h3>{{ profile.label }}</h3>
+          <p>{{ profile.summary }} <a href="{{ profile.source }}">Nutrition guidance source</a></p>
+          <p>Focus: {{ profile.nutrients|join(', ') }}.</p>
+        {% endfor %}
+        <p>Your saved personal amounts take priority over reference amounts. Intake tracking cannot diagnose a deficiency or determine a supplement dose.</p>
+      </section>
+    {% endif %}
+
     <fieldset>
-      <legend>Optional care-plan targets</legend>
+      <legend>Optional personal nutrition targets</legend>
       <label>Daily calories (kcal) <input type="number" name="custom_calories" min="500" max="10000" step="0.1" value="{{ custom_calories or '' }}"></label>
       <label>Daily carbohydrates (g) <input type="number" name="custom_carbs" min="0.1" max="1500" step="0.1" value="{{ custom_carbs or '' }}"></label>
-      <p>Leave a field blank to use the usual calculator target. During pregnancy, a blank calorie field means no calorie target is shown.</p>
+      <label>Daily protein (g) <input type="number" name="custom_protein" min="0.1" max="1500" step="0.1" value="{{ custom_protein or '' }}"></label>
+      <label>Daily fat (g) <input type="number" name="custom_fat" min="0.1" max="1500" step="0.1" value="{{ custom_fat or '' }}"></label>
+      <p>Enter gram targets from your individual care plan. Each amount you enter replaces that macro's calculator or split target; blank fields keep the usual target. During pregnancy, a blank calorie field means no calorie target is shown.</p>
     </fieldset>
 
     <details>
@@ -63,7 +77,7 @@
     </details>
 
     {% if error %}<p role="alert">{{ error }}</p>{% endif %}
-    <button type="submit">Save medical conditions settings</button>
+    <button type="submit">Save medical condition setting</button>
   </form>
   <p><a href="{{ url_for('home_page') }}">Back to homepage</a></p>
 </div>

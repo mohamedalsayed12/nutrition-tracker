@@ -3,12 +3,12 @@
 <nav>
   <h1>Nutrient Tracker</h1>
   <ul>
-    {% if g.user %}
-      <li><span>{{ g.user['username'] }}</span>
+    {% if current_user.is_authenticated %}
+      <li><span>{{ current_user.username }}</span></li>
     {% else %}
       {% if request.endpoint != 'home_page' %}
-  <li><a href="{{ url_for('registration_page') }}">Register</a></li>
-  <li><a href="{{ url_for('login_page') }}">Log In</a></li>
+  <li><a href="{{ url_for('auth.registration_page') }}">Register</a></li>
+  <li><a href="{{ url_for('auth.login_page') }}">Log In</a></li>
 {% endif %}
     {% endif %}
   </ul>

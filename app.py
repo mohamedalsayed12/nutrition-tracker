@@ -1,381 +1,38 @@
-import json
-import os
-import re
-import secrets
-import sqlite3
-import time
-from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
-from urllib.parse import unquote
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-import PySimpleGUI as sg
-import flask
-import requests
-from dotenv import load_dotenv
-from flask import Flask, url_for, g
-from flask_bcrypt import Bcrypt
-from flask_login import LoginManager, current_user, login_required, login_user
-from flask_wtf import FlaskForm
-from healthsciencecalculator.get_bmr import get_bmr
-from healthsciencecalculator.get_tdee import get_tdee
-from sqlalchemy.exc import IntegrityError
-from usda_fdc import FdcClient
-from wtforms import BooleanField, PasswordField, StringField, SubmitField
-from wtforms.validators import DataRequired
-from extensions import db
-from models import User, CalorieTarget, NutritionTargets, HealthPreferences, MealSubmission, FoodLog, ActivityLog
-from nutrient_scoring import npc_rating, remaining_targets
-from nutrient_targets import micronutrient_targets
+from imports import (os, re, secrets, date, datetime, timedelta, timezone,
+                     Decimal, InvalidOperation, unquote, ZoneInfo, ZoneInfoNotFoundError,
+                     flask, load_dotenv, Flask, current_user, login_required,
+                     IntegrityError,
+                     bcrypt, login_manager, configure_database, get_record, add_record,
+                     delete_record, commit_changes, rollback_changes, user_food_logs,
+                     user_activity_logs, saved_days_count, matching_food_logs,
+                     save_calorie_target, reopen_eating_days, auth_bp, api_bp,
+                     get_food_client,
+                     CalorieTarget, NutritionTargets, UserMeasurements,
+                     UserActivityBaseline, MacroSplit, HealthPreferences,
+                     MealSubmission, FoodLog, SavedEatingDay, ActivityLog,
+                     ExerciseDetails, ExerciseTargetCredit, npc_rating,
+                     nutrient_per_100_calories, remaining_targets,
+                     micronutrient_targets, build_weekly_recap,
+                     UserInfo, calculate_goal_targets, configured_micronutrients,
+                     apply_health_preferences, fat_target_range, custom_macro_targets,
+                     EXERCISE_METS, estimate_exercise_calories, active_exercise_calories,
+                     scaled_food_nutrients, grams_for_measure, exercise_adjusted_target,
+                     daily_target_progress, weekly_target_labels,
+                     frequent_food_choices, validate_care_plan_macros,
+                     condition_nutrition_data, condition_micronutrient_guidance)
 
 
 load_dotenv()
 
 
-#UserInfo class and what the user needs to input for their logs
-class UserInfo:
-    def __init__(self):
-        self.activity_level = None
-        self.height = None
-        self.weight = None
-        self.age = None
-        self.gender = None
-
-
-    def func(self,age,gender,height,weight,activity_level):
-        self.height=height
-        self.weight=weight
-        self.age=age
-        self.gender=gender
-        self.activity_level=activity_level
-
-##from the scientific health library it calculates the basal metabolic rate depending on age,weight,height and gender
-    def calculate_bmr(self):
-        return get_bmr(self.weight, self.height, self.age, self.gender)
-
-    def calculate_tdee(self, activity_level):
-        return get_tdee(self.calculate_bmr(), activity_level)
-
-
-
-
-class Nutrient_Tracking_App:
-    def __init__(self):
-        self.nutrients = None
-        self.calories = None
-        self.activity = None
-        self.CaloriesBurnt = None
-        self.centimeters = None
-        self.kilogram = None
-        self.minerals = None
-        self.vitamins = None
-        self.male = None
-        self.female=None
-        self.carbohydrates = None
-        self.protein = None
-        self.fat = None
-##def macros and identifying the three macronutrients protein,fat and carbs
-    def macros(self, carbohydrates, protein, fat):
-        self.carbohydrates = carbohydrates
-        self.protein = protein
-        self.fat = fat
-##defining micros and their are two categories of micronutrients vitamins and minerals
-    def micros(self, vitamins, minerals, targets):
-        self.vitamins = vitamins
-        self.minerals = minerals
-
-        consumed = {**vitamins, **minerals}
-        missing = []
-##checking the nutrients consumed compared to the target
-        for nutrient, target in targets.items():
-            amount = consumed.get(nutrient, 0)
-##if the amount of nutrients are less than the target then it will show you ypur missing nutrients(I want to add how to get them)
-            if amount < target:
-                missing.append(nutrient)
-##If nothing is missing then return the phrase
-        if not missing:
-            return "Great job on hitting your nutrient targets!"
-        else:
-            return "Still missing: " + ", ".join(missing)
-
-    def gender(self, male, female):
-        self.male=male 
-        self.female=female
-##asking the user to input their gender
-        gender = input("what is your gender")
-        
-        if gender == male:
-            return male
-        elif gender == female:
-            return female
-
-        raise ValueError('no other genders available')
-
-##asking the user to input their weight
-    def weight(self, kilogram):
-        self.kilogram = kilogram
-
-        self.kilogram = int(input("what is your weight?"))
-
-    ##asking the user to input their height
-    def height(self, centimeters):
-        self.centimeters = centimeters
-
-        self.centimeters = int(input("what is your height?"))
-
-##creating a calculation of nutrient per calorie for each food so people know if the food they are eating is high in nutrients compared to the calories
-    def npc(self, nutrient, calorie):
-        if calorie <= 0:
-            raise ValueError("Calories have to be greater than zero")
-
-        return (nutrient / calorie) * 100
-
-
-##Food have calories and nutrients which include macros and micros
-    def food(self,calories,nutrients):
-        self.calories=calories
-        self.nutrients=nutrients
-
-##The point of adding activity is so users know how many calories they have burnt in excersice to see their maintenance
-    def activities(self,activity,CaloriesBurnt):
-        self.activity = activity
-        self.CaloriesBurnt = CaloriesBurnt
-
-        load_dotenv()
-        api_key = os.getenv("FDC_API_KEY")
-        client = FdcClient(api_key)
-##Loading tha API key of the FDA to breakfast lunch and dinner and having the user be able to input food
-        layout_breakfast = [[sg.Input(default_text="breakfast", key="-breakfast-")]]
-        layout_lunch = [[sg.Input(default_text="lunch", key="-lunch-")]]
-        layout_dinner = [[sg.Input(default_text="dinner", key="-dinner-")]]
-        layout_exercise = [[sg.Input(default_text="exercise", key="-activity-")]]
-
-        layout = layout_breakfast + layout_lunch + layout_dinner + layout_exercise
-        layout += [[sg.Button("Submit"), sg.Button("delete")]]
-
-        window = sg.Window("Food and activity", layout)
-
-        while True:
-            event, values = window.read()
-            if event in (sg.WIN_CLOSED, "Quit"):
-                break
-            if event == "Submit":
-                print(values["-breakfast-"], values["-lunch-"],
-                      values["-dinner-"], values["-activity-"])
-
-
-                results = client.search(values["-breakfast-"])
-                print(f"Found {results.total_hits} results")
-                for food in results.foods:
-
-                    print(f"{food.description} (FDC ID: {food.fdc_id})")
-                    results.total_hits
-                results.foods[0].description if results.foods else None
-
-        window.close()
-        food = client.get_food(1750340)
-
-
-        print(f"Food: {food.description}")
-        print(f"Data Type: {food.data_type}")
-        print(f"Brand: {food.brand_name}")
-
-
-        print("\\nNutrients:")
-        for nutrient in food.nutrients:
-                print(f"{nutrient.name}: {nutrient.amount} {nutrient.unit_name}")
-
-
-                foods = client.get_foods([1750340, 1750341, 1750342])
-
-
-                for food in foods:
-                    print(f"{food.description} ({food.data_type})")
-
-
-                    foods = client.list_foods(page_size=10, page_number=1)
-
-
-                    for food in foods:
-                        print(f"{food.description} (FDC ID: {food.fdc_id})")
-
-
-                        next_page = client.list_foods(page_size=10, page_number=2)
-
-
-
-
-
-##Giving te user the option to search for food through using the Food's barcode
-    def find_by_barcode(client, barcode):
-        results = client.search(barcode, data_type=["Branded"], page_size=10)
-        for food in results.foods:
-            if food.gtin_upc and food.gtin_upc.lstrip("0") == barcode.lstrip("0"):
-                    return client.get_food(food.fdc_id)
-        return None
-##implementing the login
-class LoginForm(FlaskForm):
-    class Meta:
-        csrf = False
-##creating the fields for the login
-    email = StringField("Email", validators=[DataRequired()])
-    password = PasswordField("Password", validators=[DataRequired()])
-    remember = BooleanField("Remember me")
-    submit = SubmitField("Login")
-
 app=Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///users.sqlite3"
-db.init_app(app)
-bcrypt = Bcrypt(app)
-login_manager = LoginManager(app)
-login_manager.login_view = "login_page"
-
-
-@login_manager.user_loader
-def load_user(uid):
-    return db.session.get(User, int(uid))
-
-
-with app.app_context():
-    db.create_all()
-DATABASE = os.path.join(os.path.dirname(__file__), "food_cache.sqlite3")
-##getting the database for user info and logs
-def get_db():
-    db = getattr(g, "_database", None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-    return db
-
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, "_database", None)
-    if db is not None:
-        db.close()
-##getting the API for foods and adding it to the database
-##Search USDA foods and show the brand and source beside each suggestion.
-@app.get("/api/foods")
-def food_suggestions():
-    query = flask.request.args.get("q", "").strip().lower()
-    if len(query) < 2:
-        return flask.jsonify(foods=[])
-    if len(query) > 80:
-        return flask.jsonify(error="Search is too long."), 400
-
-    api_key = os.getenv("FDC_API_KEY")
-    if not api_key:
-        return flask.jsonify(error="Food search is not configured"), 503
-
-    ##Cache each search for one day to avoid repeated USDA requests.
-    db = get_db()
-    db.execute(
-        "CREATE TABLE IF NOT EXISTS food_search_cache "
-        "(query TEXT PRIMARY KEY, results TEXT NOT NULL, fetched_at INTEGER NOT NULL)"
-    )
-    cache_key = f"{query}|foods:v3"
-    cached = db.execute(
-        "SELECT results FROM food_search_cache WHERE query = ? AND fetched_at > ?",
-        (cache_key, int(time.time()) - 86400),
-    ).fetchone()
-    if cached is not None:
-        return flask.jsonify(foods=json.loads(cached[0]))
-
-    try:
-        client = FdcClient(api_key)
-        results = client.search(query, page_size=8)
-        foods = [
-            {
-                "fdc_id": food.fdc_id,
-                "description": food.description,
-                "data_type": food.data_type,
-                "brand_name": food.brand_name,
-            }
-            for food in results.foods
-        ]
-    except Exception:
-        return flask.jsonify(error="Food search is temporarily unavailable."), 502
-
-    db.execute(
-        "INSERT OR REPLACE INTO food_search_cache (query, results, fetched_at) "
-        "VALUES (?, ?, ?)", (cache_key, json.dumps(foods), int(time.time()))
-    )
-    db.commit()
-    return flask.jsonify(foods=foods)
-
-
-##getting the API for excersices and making it searchable in the excersices section of the tracker
-@app.get("/api/exercises")
-def exercise_suggestions():
-    query = flask.request.args.get("q", "").strip()
-    if len(query) < 2:
-        return flask.jsonify(exercises=[])
-
-    api_key = os.getenv("API_NINJAS_KEY")
-    if not api_key:
-        return flask.jsonify(error="Exercise search is not configured"), 503
-
-    try:
-        response = requests.get(
-            "https://api.api-ninjas.com/v1/exercises",
-            params={"name": query},
-            headers={"X-Api-Key": api_key},
-            timeout=5,
-        )
-        response.raise_for_status()
-        exercises = [item["name"] for item in response.json()]
-    except (requests.RequestException, ValueError, KeyError, TypeError):
-        return flask.jsonify(error="Exercise search is temporarily unavailable."), 502
-
-    db = get_db()
-    db.execute(
-        "CREATE TABLE IF NOT EXISTS exercise_search_cache "
-        "(query TEXT PRIMARY KEY, results TEXT NOT NULL, fetched_at INTEGER NOT NULL)"
-    )
-    db.execute(
-        "INSERT OR REPLACE INTO exercise_search_cache (query, results, fetched_at) "
-        "VALUES (?, ?, ?)", (query, json.dumps(exercises), int(time.time()))
-    )
-    db.commit()
-    return flask.jsonify(exercises=exercises)
-##Apply pregnancy references and user-entered care-plan values to saved targets.
-def configured_micronutrients(age, sex, preferences):
-    pregnant = preferences is not None and "pregnancy" in (preferences.conditions or [])
-    targets = micronutrient_targets(age, sex, pregnant=pregnant)
-    overrides = (preferences.micronutrient_overrides or {}) if preferences is not None else {}
-    for target in targets:
-        if target["name"] in overrides:
-            target["target"] = overrides[target["name"]]
-            target["custom"] = True
-    return targets
-
-
-def apply_health_preferences(nutrition, preferences):
-    nutrition.micronutrients = configured_micronutrients(nutrition.age, nutrition.sex, preferences)
-    if preferences is None:
-        return None
-    calories = preferences.custom_calories
-    if calories is None and "pregnancy" not in (preferences.conditions or []):
-        calories = preferences.base_calories
-    if preferences.custom_calories is not None:
-        nutrition.protein_min = round(calories * 0.10 / 4, 1)
-        nutrition.protein_max = round(calories * 0.35 / 4, 1)
-    else:
-        nutrition.protein_min = preferences.base_protein_min
-        nutrition.protein_max = preferences.base_protein_max
-    nutrition.carbs = (preferences.custom_carbs if preferences.custom_carbs is not None else
-                       round(calories * 0.55 / 4, 1) if preferences.custom_calories is not None else
-                       preferences.base_carbs)
-    return calories
-
-
-def save_calorie_target(user_id, calories):
-    target = db.session.get(CalorieTarget, user_id)
-    if calories is None:
-        if target is not None:
-            db.session.delete(target)
-    elif target is None:
-        db.session.add(CalorieTarget(user_id=user_id, calories=calories))
-    else:
-        target.calories = calories
+configure_database(app)
+bcrypt.init_app(app)
+login_manager.init_app(app)
+login_manager.login_view = "auth.login_page"
+app.register_blueprint(auth_bp)
+app.register_blueprint(api_bp)
 
 
 def optional_positive_number(field, maximum):
@@ -388,14 +45,13 @@ def optional_positive_number(field, maximum):
     return float(amount)
 
 
-##userinfo page which has the calorie calculator and they can add their details so their maintenance can be calculated
-##Calculate calorie and macro goals plus personal micronutrient targets from UserInfo.
 @app.route("/UserInfo", methods=["GET", "POST"])
 @login_required
 def user_info_page():
     bmr = tdee = calories_for_goal = protein_min = protein_max = carbs = error = None
     micronutrients = None
-    preferences = db.session.get(HealthPreferences, current_user.uid)
+    preferences = get_record(HealthPreferences, current_user.uid)
+    macro_split = get_record(MacroSplit, current_user.uid)
     pregnancy_active = preferences is not None and "pregnancy" in (preferences.conditions or [])
     if flask.request.method == "POST":
         try:
@@ -408,70 +64,127 @@ def user_info_page():
                 activity_level=flask.request.form["activity_level"],
             )
             if info.height <= 0 or info.weight <= 0:
-                raise ValueError("Height and weight must be positive.")
+                raise ValueError("please enter a valid height and weight.")
             micronutrients = configured_micronutrients(info.age, info.gender, preferences)
-            bmr = info.calculate_bmr()
-            tdee = info.calculate_tdee(flask.request.form["activity_level"])
-            goal = flask.request.form["goal"]
-            if pregnancy_active and goal != "maintain":
-                raise ValueError("Use a maintenance goal for this baseline estimate during pregnancy; set your pregnancy calorie target in Medical conditions settings.")
-            ##Adjust calories for the selected weight goal before saving targets.
-            if goal == "maintain":
-                calories_for_goal = tdee
-            elif goal == "lose_weight":
-                minimum = 1200 if info.gender == "female" else 1500
-                if tdee <= minimum:
-                    raise ValueError("A weight-loss calorie target cannot be estimated from these inputs.")
-                calories_for_goal = max(tdee - 500, minimum)
-            elif goal == "gain_weight":
-                calories_for_goal = tdee + 300
-            else:
-                raise ValueError("Choose a valid goal.")
-            protein_min = round(calories_for_goal * 0.10 / 4, 1)
-            protein_max = round(calories_for_goal * 0.35 / 4, 1)
-            carbs = round(calories_for_goal * 0.55 / 4, 1)
-            calories_for_goal = round(calories_for_goal, 1)
-            ##Save the baseline and apply any condition settings and care-plan overrides.
-            nutrition = db.session.get(NutritionTargets, current_user.uid)
+            bmr, tdee, calories_for_goal, protein_min, protein_max, carbs = calculate_goal_targets(
+                info, flask.request.form["goal"], pregnancy_active
+            )
+            nutrition = get_record(NutritionTargets, current_user.uid)
             if nutrition is None:
                 nutrition = NutritionTargets(user_id=current_user.uid)
-                db.session.add(nutrition)
+                add_record(nutrition)
             nutrition.age = info.age
             nutrition.sex = info.gender
             nutrition.protein_min = protein_min
             nutrition.protein_max = protein_max
             nutrition.carbs = carbs
             nutrition.micronutrients = micronutrients
+            measurements = get_record(UserMeasurements, current_user.uid)
+            if measurements is None:
+                measurements = UserMeasurements(user_id=current_user.uid)
+                add_record(measurements)
+            measurements.height_cm = info.height
+            measurements.weight_kg = info.weight
+            activity_baseline = get_record(UserActivityBaseline, current_user.uid)
+            if activity_baseline is None:
+                activity_baseline = UserActivityBaseline(user_id=current_user.uid)
+                add_record(activity_baseline)
+            elif activity_baseline.activity_level != info.activity_level:
+                activity_baseline.changed_at = datetime.now(timezone.utc)
+            activity_baseline.activity_level = info.activity_level
             if preferences is not None:
                 preferences.base_calories = calories_for_goal
                 preferences.base_carbs = carbs
                 preferences.base_protein_min = protein_min
                 preferences.base_protein_max = protein_max
                 effective_calories = apply_health_preferences(nutrition, preferences)
+                validate_care_plan_macros(effective_calories, preferences)
                 micronutrients = nutrition.micronutrients
             else:
                 effective_calories = calories_for_goal
             save_calorie_target(current_user.uid, effective_calories)
-            db.session.commit()
+            commit_changes()
         except (KeyError, TypeError, ValueError, InvalidOperation) as exc:
-            db.session.rollback()
+            rollback_changes()
             error = str(exc)
     return flask.render_template(
         "user_info.html", bmr=bmr, tdee=tdee, error=error,
         values=flask.request.form, calories_for_goal=calories_for_goal,
         protein_min=protein_min, protein_max=protein_max, carbs=carbs,
+        fat_range=fat_target_range(calories_for_goal, info.age) if calories_for_goal is not None else None,
+        macro_split=macro_split,
+        custom_macros=custom_macro_targets(calories_for_goal, macro_split, preferences) if calories_for_goal is not None else None,
         micronutrients=micronutrients, pregnancy_active=pregnancy_active,
     )
 
 
-##Let users select pregnancy, diabetes, or IBS and enter individual care-plan targets.
+@app.route("/macro-split", methods=["GET", "POST"])
+@login_required
+def macro_split_settings():
+    nutrition = get_record(NutritionTargets, current_user.uid)
+    if nutrition is None:
+        return flask.redirect(flask.url_for("user_info_page"))
+    split = get_record(MacroSplit, current_user.uid)
+    error = None
+    token = flask.session.get("_macro_token")
+    if token is None:
+        token = secrets.token_urlsafe(32)
+        flask.session["_macro_token"] = token
+    if flask.request.method == "POST":
+        if not secrets.compare_digest(flask.request.form.get("_macro_token", ""), token):
+            flask.abort(400)
+        try:
+            action = flask.request.form.get("action", "save")
+            if action == "default":
+                if split is not None:
+                    delete_record(split)
+            elif action == "save":
+                percentages = {}
+                for name in ("carbs", "protein", "fat"):
+                    value = Decimal(flask.request.form[f"{name}_percent"])
+                    if not value.is_finite() or value < 0 or value > 100:
+                        raise ValueError("Each percentage must be between 0 and 100.")
+                    percentages[name] = value
+                if sum(percentages.values()) != 100:
+                    raise ValueError("Carbohydrates, protein, and fat must add up to 100%.")
+                if split is None:
+                    split = MacroSplit(user_id=current_user.uid)
+                    add_record(split)
+                split.carbs_percent = float(percentages["carbs"])
+                split.protein_percent = float(percentages["protein"])
+                split.fat_percent = float(percentages["fat"])
+            else:
+                raise ValueError("Choose a valid macro split action.")
+            commit_changes()
+            return flask.redirect(flask.url_for("home_page"))
+        except (KeyError, ValueError, InvalidOperation) as exc:
+            rollback_changes()
+            error = str(exc) if not isinstance(exc, KeyError) else "Enter all three percentages."
+    values = {
+        name: flask.request.form.get(f"{name}_percent", "") if flask.request.method == "POST"
+        else getattr(split, f"{name}_percent") if split is not None
+        else default
+        for name, default in (("carbs", 55), ("protein", 20), ("fat", 25))
+    }
+    preferences = get_record(HealthPreferences, current_user.uid)
+    target = get_record(CalorieTarget, current_user.uid)
+    return flask.render_template(
+        "macro_split.html", values=values, error=error, token=token, split=split,
+        calorie_target=target.calories if target is not None else None,
+        overridden_macros=[name for name, field in (("carbohydrate", "custom_carbs"),
+                                                  ("protein", "custom_protein"),
+                                                  ("fat", "custom_fat"))
+                           if preferences is not None and getattr(preferences, field) is not None],
+    )
+
+
 @app.route("/health-settings", methods=["GET", "POST"])
 @login_required
 def health_settings():
-    nutrition = db.session.get(NutritionTargets, current_user.uid)
+    nutrition = get_record(NutritionTargets, current_user.uid)
     if nutrition is None:
         return flask.redirect(flask.url_for("user_info_page"))
-    preferences = db.session.get(HealthPreferences, current_user.uid)
+    preferences = get_record(HealthPreferences, current_user.uid)
     error = None
     token = flask.session.get("_health_token")
     if token is None:
@@ -484,8 +197,10 @@ def health_settings():
             flask.abort(400)
         try:
             conditions = set(flask.request.form.getlist("conditions"))
-            if not conditions.issubset({"pregnancy", "diabetes", "ibs"}):
-                raise ValueError("Choose a listed health condition.")
+            if not conditions.issubset({"pregnancy", "diabetes", "ibs", "menstruation"}):
+                raise ValueError("Choose a listed medical condition.")
+            if {"pregnancy", "menstruation"}.issubset(conditions):
+                raise ValueError("Choose pregnancy or periods / menstruation. Bleeding during pregnancy needs clinical advice.")
             pregnant = "pregnancy" in conditions
             base_targets = micronutrient_targets(nutrition.age, nutrition.sex, pregnant=pregnant)
             trimester = None
@@ -497,6 +212,8 @@ def health_settings():
             if custom_calories is not None and custom_calories < 500:
                 raise ValueError("Enter a calorie target of at least 500 kcal or leave it blank.")
             custom_carbs = optional_positive_number("custom_carbs", 1500)
+            custom_protein = optional_positive_number("custom_protein", 1500)
+            custom_fat = optional_positive_number("custom_fat", 1500)
             overrides = {}
             for index, target in enumerate(base_targets):
                 amount = optional_positive_number(f"micro_{index}", 1000000)
@@ -504,7 +221,7 @@ def health_settings():
                     overrides[target["name"]] = amount
 
             if preferences is None:
-                current_target = db.session.get(CalorieTarget, current_user.uid)
+                current_target = get_record(CalorieTarget, current_user.uid)
                 preferences = HealthPreferences(
                     user_id=current_user.uid,
                     base_calories=current_target.calories if current_target is not None else None,
@@ -512,18 +229,21 @@ def health_settings():
                     base_protein_min=nutrition.protein_min,
                     base_protein_max=nutrition.protein_max,
                 )
-                db.session.add(preferences)
+                add_record(preferences)
             preferences.conditions = sorted(conditions)
             preferences.trimester = trimester
             preferences.custom_calories = custom_calories
             preferences.custom_carbs = custom_carbs
+            preferences.custom_protein = custom_protein
+            preferences.custom_fat = custom_fat
             preferences.micronutrient_overrides = overrides
             effective_calories = apply_health_preferences(nutrition, preferences)
+            validate_care_plan_macros(effective_calories, preferences)
             save_calorie_target(current_user.uid, effective_calories)
-            db.session.commit()
+            commit_changes()
             return flask.redirect(flask.url_for("health_settings"))
         except (ValueError, TypeError, InvalidOperation) as exc:
-            db.session.rollback()
+            rollback_changes()
             error = str(exc)
 
     selected = (flask.request.form.getlist("conditions") if flask.request.method == "POST" else
@@ -543,7 +263,12 @@ def health_settings():
                          else preferences.custom_calories if preferences is not None else ""),
         custom_carbs=(flask.request.form.get("custom_carbs", "") if flask.request.method == "POST"
                       else preferences.custom_carbs if preferences is not None else ""),
+        custom_protein=(flask.request.form.get("custom_protein", "") if flask.request.method == "POST"
+                        else preferences.custom_protein if preferences is not None else ""),
+        custom_fat=(flask.request.form.get("custom_fat", "") if flask.request.method == "POST"
+                    else preferences.custom_fat if preferences is not None else ""),
         token=token, age=nutrition.age, sex=nutrition.sex,
+        condition_guidance=condition_micronutrient_guidance(selected),
     )
 
 
@@ -552,7 +277,6 @@ def create_app():
     return app
 
 
-##Read the browser's time zone so each user's day follows their location.
 def user_timezone():
     name = unquote(flask.request.cookies.get("tracker_timezone", "UTC"))
     try:
@@ -561,14 +285,51 @@ def user_timezone():
         return ZoneInfo("UTC")
 
 
-##Group logs by the user's local day instead of the database's UTC timestamp.
 def local_day(logged_at, local_timezone):
     if logged_at.tzinfo is None:
         logged_at = logged_at.replace(tzinfo=timezone.utc)
     return logged_at.astimezone(local_timezone).date()
 
 
-##Check the session token before deleting a food or exercise entry.
+@app.get("/weekly-recap")
+@login_required
+def weekly_recap_page():
+    local_timezone = user_timezone()
+    today = datetime.now(local_timezone).date()
+    current_week_start = today - timedelta(days=today.weekday())
+    requested = flask.request.args.get("week", "")
+    try:
+        selected_day = date.fromisoformat(requested) if requested else today
+    except ValueError:
+        flask.abort(400)
+    week_start = selected_day - timedelta(days=selected_day.weekday())
+    if week_start > current_week_start:
+        return flask.redirect(flask.url_for("weekly_recap_page"))
+    week_end = week_start + timedelta(days=6)
+    nutrition = get_record(NutritionTargets, current_user.uid)
+    preferences = get_record(HealthPreferences, current_user.uid)
+    split = get_record(MacroSplit, current_user.uid)
+    target = get_record(CalorieTarget, current_user.uid)
+    calories = target.calories if target is not None else None
+    micronutrients = (configured_micronutrients(nutrition.age, nutrition.sex, preferences)
+                      if nutrition is not None else [])
+    food_logs = user_food_logs(current_user.uid)
+    recap = build_weekly_recap(food_logs, local_timezone, week_start, micronutrients)
+    saved_count = saved_days_count(current_user.uid, week_start, week_end)
+    target_labels = weekly_target_labels(calories, nutrition, split, preferences)
+    return flask.render_template(
+        "weekly_recap.html", recap=recap, week_start=week_start, week_end=week_end,
+        previous_week=(week_start - timedelta(days=7)).isoformat(),
+        next_week=(week_start + timedelta(days=7)).isoformat() if week_start < current_week_start else None,
+        saved_count=saved_count, target_labels=target_labels,
+    )
+
+
+
+
+
+
+
 def verify_delete_token():
     expected = flask.session.get("_delete_token", "")
     supplied = flask.request.form.get("_delete_token", "")
@@ -576,22 +337,41 @@ def verify_delete_token():
         flask.abort(400)
 
 
-##Delete the chosen food entry and any rapid duplicate copies of that entry.
+@app.post("/days/save")
+@login_required
+def save_eating_day():
+    expected = flask.session.get("_save_day_token", "")
+    supplied = flask.request.form.get("_save_day_token", "")
+    if not expected or not secrets.compare_digest(supplied, expected):
+        flask.abort(400)
+    try:
+        day = date.fromisoformat(flask.request.form.get("day", ""))
+    except ValueError:
+        flask.abort(400)
+    if day > datetime.now(user_timezone()).date():
+        flask.abort(400)
+    foods = user_food_logs(current_user.uid)
+    if not any(local_day(food.logged_at, user_timezone()) == day for food in foods):
+        flask.flash("Log at least one food for that day before saving it.")
+        return flask.redirect(flask.url_for("home_page"))
+    saved = get_record(SavedEatingDay, (current_user.uid, day))
+    if saved is None:
+        add_record(SavedEatingDay(user_id=current_user.uid, day=day))
+        commit_changes()
+    flask.flash("Day of eating saved.")
+    return flask.redirect(flask.url_for("home_page"))
+
+
 @app.post("/logs/food/<int:log_id>/delete")
 @login_required
 def delete_food_log(log_id):
     verify_delete_token()
     local_timezone = user_timezone()
-    log = db.session.get(FoodLog, log_id)
+    log = get_record(FoodLog, log_id)
     if log is None or log.user_id != current_user.uid:
         flask.abort(404)
 
-    matching = (
-        FoodLog.query
-        .filter_by(user_id=current_user.uid, meal=log.meal, fdc_id=log.fdc_id, grams=log.grams)
-        .order_by(FoodLog.logged_at.desc(), FoodLog.id.desc())
-        .all()
-    )
+    matching = matching_food_logs(current_user.uid, log.meal, log.fdc_id, log.grams)
     clusters = []
     previous = None
     for entry in matching:
@@ -602,23 +382,24 @@ def delete_food_log(log_id):
         previous = entry
     for cluster in clusters:
         if any(entry.id == log_id for entry in cluster):
+            changed_days = {local_day(entry.logged_at, local_timezone) for entry in cluster}
             for entry in cluster:
-                db.session.delete(entry)
+                delete_record(entry)
+            reopen_eating_days(current_user.uid, changed_days)
             break
-    db.session.commit()
+    commit_changes()
     return flask.redirect(flask.url_for("home_page"))
 
 
-##Let a user remove only their own exercise entry.
 @app.post("/logs/activity/<int:log_id>/delete")
 @login_required
 def delete_activity_log(log_id):
     verify_delete_token()
-    log = db.session.get(ActivityLog, log_id)
+    log = get_record(ActivityLog, log_id)
     if log is None or log.user_id != current_user.uid:
         flask.abort(404)
-    db.session.delete(log)
-    db.session.commit()
+    delete_record(log)
+    commit_changes()
     return flask.redirect(flask.url_for("home_page"))
 
 @app.route("/homepage", methods=["GET", "POST"])
@@ -626,17 +407,20 @@ def delete_activity_log(log_id):
 def home_page():
     error = None
     local_timezone = user_timezone()
-    ##Give each save a unique token so browser retries do not duplicate meals.
+    measurements = get_record(UserMeasurements, current_user.uid)
+    activity_baseline = get_record(UserActivityBaseline, current_user.uid)
+    preferences = get_record(HealthPreferences, current_user.uid)
+    fixed_care_plan_target = preferences is not None and preferences.custom_calories is not None
     submission_token = flask.request.form.get("_submission_token") or secrets.token_urlsafe(32)
 
     if flask.request.method == "POST":
         try:
-            db.session.add(MealSubmission(user_id=current_user.uid, token=submission_token))
-            api_key = os.getenv("FDC_API_KEY")
-            if not api_key:
-                raise ValueError("Food search is not configured.")
-
-            client = FdcClient(api_key)
+            add_record(MealSubmission(user_id=current_user.uid, token=submission_token))
+            has_food = any(flask.request.form.get(meal, "").strip() for meal in ("breakfast", "lunch", "dinner"))
+            activity = flask.request.form.get("activity", "").strip()
+            if not has_food and not activity:
+                raise ValueError("Choose a food or enter an exercise to save.")
+            client = get_food_client() if has_food else None
             new_food_logs = []
 
             for meal in ("breakfast", "lunch", "dinner"):
@@ -644,34 +428,22 @@ def home_page():
                 if not selection:
                     continue
 
-                # The suggestion contains both the name and the FDC ID.
                 match = re.fullmatch(r".+ \[FDC:(\d+)\]", selection)
                 if not match:
                     raise ValueError(f"Please select a {meal} food from the suggestions.")
 
-                grams_text = flask.request.form.get(f"{meal}_grams", "").strip()
-                grams = Decimal(grams_text)
-                if not grams.is_finite() or grams <= 0:
-                    raise ValueError(f"Enter a positive gram amount for {meal}.")
-
                 fdc_id = int(match.group(1))
                 food = client.get_food(fdc_id)
+                measure = flask.request.form.get(f"{meal}_measure", "").strip()
+                if measure:
+                    quantity = Decimal(flask.request.form.get(f"{meal}_amount", ""))
+                    grams = grams_for_measure(food, quantity, measure)
+                else:
+                    grams = Decimal(flask.request.form.get(f"{meal}_grams", "").strip())
+                    if not grams.is_finite() or grams <= 0:
+                        raise ValueError(f"Enter a positive gram amount for {meal}.")
 
-                ##Scale the USDA per-100 g values to the entered gram amount.
-                nutrients = []
-                for nutrient in food.nutrients:
-                    if nutrient.amount is None:
-                        continue  # Missing data is not the same as zero.
-
-                    per_100g = Decimal(str(nutrient.amount))
-                    eaten_amount = per_100g * grams / Decimal("100")
-
-                    nutrients.append({
-                        "name": nutrient.name,
-                        "unit": nutrient.unit_name,
-                        "per_100g": float(per_100g),
-                        "eaten": round(float(eaten_amount), 3),
-                    })
+                nutrients = scaled_food_nutrients(food, grams)
 
                 new_food_logs.append(FoodLog(
                     user_id=current_user.uid,
@@ -680,40 +452,78 @@ def home_page():
                     food_name=food.description,
                     grams=float(grams),
                     nutrients=nutrients,
+                    logged_at=datetime.now(timezone.utc),
                 ))
 
             for log in new_food_logs:
-                db.session.add(log)
+                add_record(log)
+            if new_food_logs:
+                reopen_eating_days(current_user.uid, {
+                    local_day(log.logged_at, local_timezone) for log in new_food_logs
+                })
 
-            activity = flask.request.form.get("activity", "").strip()
             if activity:
-                db.session.add(ActivityLog(
+                nutrition_for_exercise = get_record(NutritionTargets, current_user.uid)
+                if nutrition_for_exercise is None:
+                    raise ValueError("Complete UserInfo before logging exercise calories.")
+                duration = int(flask.request.form.get("activity_minutes", ""))
+                weight = int(flask.request.form.get("exercise_weight", ""))
+                height = int(flask.request.form.get("exercise_height", ""))
+                if not all(value.is_finite() for value in (duration, weight, height)):
+                    raise ValueError("Enter exercise duration, weight, and height values.")
+                if not 0 < duration <= 1440:
+                    raise ValueError("Exercise duration must be greater than 0 and no more than 1,440 minutes.")
+                if not 10 <= weight <= 500 or not 50 <= height <= 300:
+                    raise ValueError("Enter a weight from 10 to 500 kg and a height from 50 to 300 cm.")
+                activity_type = flask.request.form.get("activity_type", "")
+                if activity_type not in EXERCISE_METS:
+                    raise ValueError("Choose an exercise for the calorie estimate")
+                calories_burned = estimate_exercise_calories(
+                    float(duration), activity_type, float(weight), float(height),
+                    nutrition_for_exercise.age, nutrition_for_exercise.sex,
+                )
+                extra_exercise = flask.request.form.get("extra_exercise") == "1"
+                if extra_exercise and activity_baseline is None:
+                    raise ValueError("Recalculate UserInfo to save your usual activity level before adding exercise to your target.")
+                if extra_exercise and fixed_care_plan_target:
+                    raise ValueError("Your care-plan calorie target is fixed; log the exercise without adding it to the target.")
+                met = EXERCISE_METS[activity_type][0]
+                active_calories = active_exercise_calories(calories_burned, activity_type)
+                add_record(ActivityLog(
                     user_id=current_user.uid,
                     activity=activity,
+                    details=ExerciseDetails(
+                        duration_minutes=float(duration), calories_burned=calories_burned,
+                        activity_type=activity_type, met=met,
+                        height_cm=float(height), weight_kg=float(weight),
+                    ),
+                    target_credit=ExerciseTargetCredit(
+                        extra=extra_exercise, active_calories=active_calories,
+                    ),
                 ))
+                if measurements is None:
+                    measurements = UserMeasurements(user_id=current_user.uid)
+                    add_record(measurements)
+                measurements.height_cm = float(height)
+                measurements.weight_kg = float(weight)
 
-            db.session.commit()
+            commit_changes()
             return flask.redirect(flask.url_for("home_page"))
 
         except IntegrityError:
-            db.session.rollback()
-            if db.session.get(MealSubmission, (current_user.uid, submission_token)) is not None:
+            rollback_changes()
+            if get_record(MealSubmission, (current_user.uid, submission_token)) is not None:
                 return flask.redirect(flask.url_for("home_page"))
             error = "Could not save the meal. Please try again."
         except (ValueError, InvalidOperation) as exc:
-            db.session.rollback()
+            rollback_changes()
             error = str(exc)
         except Exception:
-            db.session.rollback()
+            rollback_changes()
             error = "Could not retrieve or save the food details. Please try again."
 
-    all_food_logs = (
-        FoodLog.query
-        .filter_by(user_id=current_user.uid)
-        .order_by(FoodLog.logged_at.desc(), FoodLog.id.desc())
-        .all()
-    )
-    ##Show one visible copy of a rapid duplicate within each meal and day.
+    all_food_logs = user_food_logs(current_user.uid, newest_first=True)
+    frequent_foods = frequent_food_choices(all_food_logs)
     last_seen = {}
     meal_groups = {}
     for log in all_food_logs:
@@ -728,27 +538,29 @@ def home_page():
         if group_key not in meal_groups:
             meal_groups[group_key] = {"date": day, "meal": log.meal, "foods": []}
         meal_groups[group_key]["foods"].append(log)
-    activity_logs = (
-        ActivityLog.query
-        .filter_by(user_id=current_user.uid)
-        .order_by(ActivityLog.logged_at.desc())
-        .all()
-    )
+    activity_logs = user_activity_logs(current_user.uid)
     for log in activity_logs:
         log.local_date = local_day(log.logged_at, local_timezone)
-    target = db.session.get(CalorieTarget, current_user.uid)
-    nutrition = db.session.get(NutritionTargets, current_user.uid)
-    preferences = db.session.get(HealthPreferences, current_user.uid)
-    ##Refresh older saved target lists when new micronutrients are added.
+    target = get_record(CalorieTarget, current_user.uid)
+    nutrition = get_record(NutritionTargets, current_user.uid)
+    macro_split = get_record(MacroSplit, current_user.uid)
     if nutrition is not None:
         current_micronutrients = configured_micronutrients(nutrition.age, nutrition.sex, preferences)
         if nutrition.micronutrients != current_micronutrients:
             nutrition.micronutrients = current_micronutrients
-            db.session.commit()
+            commit_changes()
     today = datetime.now(local_timezone).date()
-    ##Rate each food with NPC and total today's logged micronutrients.
+    today_saved = get_record(SavedEatingDay, (current_user.uid, today)) is not None
+    save_day_token = flask.session.get("_save_day_token")
+    if save_day_token is None:
+        save_day_token = secrets.token_urlsafe(32)
+        flask.session["_save_day_token"] = save_day_token
+
+    exercise_credit_today, daily_calorie_target = exercise_adjusted_target(
+        target, activity_logs, today, activity_baseline, fixed_care_plan_target
+    )
     today_food_logs = []
-    npc_calculator = Nutrient_Tracking_App().npc
+    npc_calculator = nutrient_per_100_calories
     for group in meal_groups.values():
         for log in group["foods"]:
             log.npc_result = npc_rating(
@@ -760,61 +572,45 @@ def home_page():
             if group["date"] == today:
                 today_food_logs.append(log)
     micronutrients_remaining = remaining_targets(today_food_logs, nutrition.micronutrients) if nutrition is not None else None
+    (daily_progress, daily_fat_range, daily_custom_macros,
+     protein_min, protein_max, carbs_target) = daily_target_progress(
+        today_food_logs, daily_calorie_target, exercise_credit_today,
+        nutrition, macro_split, preferences,
+    )
+    condition_nutrition = condition_nutrition_data(today_food_logs, daily_calorie_target)
     delete_token = flask.session.get("_delete_token")
     if delete_token is None:
         delete_token = secrets.token_urlsafe(32)
         flask.session["_delete_token"] = delete_token
-##Homepage template that I got from github
     return flask.render_template(
         "homepage.html",
         values=None,
         error=error,
         meal_groups=meal_groups.values(),
+        frequent_foods=frequent_foods,
         activity_logs=activity_logs,
+        exercise_met_options=EXERCISE_METS,
+        exercise_measurements=measurements,
+        activity_baseline=activity_baseline,
+        fixed_care_plan_target=fixed_care_plan_target,
+        exercise_credit_today=exercise_credit_today,
         logging_day=today,
+        today_saved=today_saved,
+        save_day_token=save_day_token,
         calorie_target=target.calories if target is not None else None,
+        daily_calorie_target=daily_calorie_target,
+        daily_progress=daily_progress,
+        fat_range=daily_fat_range,
+        display_protein_min=protein_min,
+        display_protein_max=protein_max,
+        display_carbs=carbs_target,
+        macro_split=macro_split,
+        custom_macros=daily_custom_macros,
         nutrition_targets=nutrition,
         health_preferences=preferences,
         micronutrients_remaining=micronutrients_remaining,
+        condition_nutrition=condition_nutrition,
+        condition_guidance=condition_micronutrient_guidance(preferences.conditions if preferences else []),
         submission_token=submission_token,
         delete_token=delete_token,
     )
-
-##Login page and login authentication
-@app.route("/login", methods=["GET", "POST"])
-def login_page():
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data.strip().lower()).first()
-        if user is None or not bcrypt.check_password_hash(user.password, form.password.data):
-            return flask.render_template('login.html', form=form, erorr='Invalid email or password.')
-        login_user(user)
-        flask.flash('Logged in successful.')
-        return flask.redirect(flask.url_for('home_page'))
-    return flask.render_template('login.html', form=form)
-
-
-@app.route("/register", methods=["GET", "POST"])
-def registration_page():
-    ##register page and authentication
-    if flask.request.method == 'POST':
-        name = flask.request.form.get('name', '').strip()
-        email = flask.request.form.get('email', '').strip().lower()
-        password = flask.request.form.get('password', '')
-        if not name or not email or not password:
-            return flask.render_template('register.html', error='All fields are required.'), 400
-        if User.query.filter_by(email=email).first() is not None:
-            return flask.render_template('register.html', error='Email is already registered.'), 409
-##hashes the password to the database s it doesn't show users passwords for security reasons
-        password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-        user = User(username=name, email=email, password=password_hash)
-        db.session.add(user)
-        db.session.commit()
-        return flask.redirect(flask.url_for('login_page'))
-
-    return flask.render_template('register.html')
-
-with app.test_request_context():
-    print(url_for("home_page"))
-    print(url_for("login_page"))
-    print(url_for("registration_page"))

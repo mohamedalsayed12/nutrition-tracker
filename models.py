@@ -1,7 +1,5 @@
-from datetime import datetime, timezone
-
-from flask_login import UserMixin
-from extensions import db
+from imports import datetime, timezone, UserMixin
+from db import db
 
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
@@ -18,7 +16,6 @@ class User(db.Model, UserMixin):
         return str(self.uid)
 
 
-##Save each user's daily calorie goal from the UserInfo calculator.
 class CalorieTarget(db.Model):
     __tablename__ = "calorie_targets"
 
@@ -26,7 +23,6 @@ class CalorieTarget(db.Model):
     calories = db.Column(db.Float, nullable=False)
 
 
-##Keep the age and sex used for personal macro and micronutrient targets.
 class NutritionTargets(db.Model):
     __tablename__ = "nutrition_targets"
 
@@ -39,7 +35,31 @@ class NutritionTargets(db.Model):
     micronutrients = db.Column(db.JSON, nullable=False)
 
 
-##Keep selected health conditions and optional care-plan targets per user.
+class UserMeasurements(db.Model):
+    __tablename__ = "user_measurements"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
+    height_cm = db.Column(db.Float, nullable=False)
+    weight_kg = db.Column(db.Float, nullable=False)
+
+
+class UserActivityBaseline(db.Model):
+    __tablename__ = "user_activity_baselines"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
+    activity_level = db.Column(db.String(30), nullable=False)
+    changed_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class MacroSplit(db.Model):
+    __tablename__ = "macro_splits"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
+    carbs_percent = db.Column(db.Float, nullable=False)
+    protein_percent = db.Column(db.Float, nullable=False)
+    fat_percent = db.Column(db.Float, nullable=False)
+
+
 class HealthPreferences(db.Model):
     __tablename__ = "health_preferences"
 
@@ -48,6 +68,8 @@ class HealthPreferences(db.Model):
     trimester = db.Column(db.Integer, nullable=True)
     custom_calories = db.Column(db.Float, nullable=True)
     custom_carbs = db.Column(db.Float, nullable=True)
+    custom_protein = db.Column(db.Float, nullable=True)
+    custom_fat = db.Column(db.Float, nullable=True)
     micronutrient_overrides = db.Column(db.JSON, nullable=False, default=dict)
     base_calories = db.Column(db.Float, nullable=True)
     base_carbs = db.Column(db.Float, nullable=True)
@@ -55,7 +77,6 @@ class HealthPreferences(db.Model):
     base_protein_max = db.Column(db.Float, nullable=True)
 
 
-##Reject a repeated form submission so one click cannot save a meal twice.
 class MealSubmission(db.Model):
     __tablename__ = "meal_submissions"
 
@@ -63,7 +84,6 @@ class MealSubmission(db.Model):
     token = db.Column(db.String(64), primary_key=True)
 
 
-##Store a food's USDA ID, gram amount, and nutrient values for its meal entry.
 class FoodLog(db.Model):
     __tablename__ = "food_logs"
 
@@ -81,15 +101,44 @@ class FoodLog(db.Model):
     )
 
 
-##Store exercise entries separately so users can remove them individually.
+class SavedEatingDay(db.Model):
+    __tablename__ = "saved_eating_days"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
+    day = db.Column(db.Date, primary_key=True)
+    saved_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
 class ActivityLog(db.Model):
     __tablename__ = "activity_logs"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), nullable=False, index=True)
     activity = db.Column(db.String(200), nullable=False)
+    details = db.relationship("ExerciseDetails", uselist=False, cascade="all, delete-orphan")
+    target_credit = db.relationship("ExerciseTargetCredit", uselist=False, cascade="all, delete-orphan")
     logged_at = db.Column(
         db.DateTime,
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+class ExerciseDetails(db.Model):
+    __tablename__ = "exercise_details"
+
+    activity_log_id = db.Column(db.Integer, db.ForeignKey("activity_logs.id"), primary_key=True)
+    duration_minutes = db.Column(db.Float, nullable=False)
+    calories_burned = db.Column(db.Float, nullable=False)
+    activity_type = db.Column(db.String(30), nullable=False)
+    met = db.Column(db.Float, nullable=False)
+    height_cm = db.Column(db.Float, nullable=False)
+    weight_kg = db.Column(db.Float, nullable=False)
+
+
+class ExerciseTargetCredit(db.Model):
+    __tablename__ = "exercise_target_credits"
+
+    activity_log_id = db.Column(db.Integer, db.ForeignKey("activity_logs.id"), primary_key=True)
+    extra = db.Column(db.Boolean, nullable=False)
+    active_calories = db.Column(db.Float, nullable=False)
