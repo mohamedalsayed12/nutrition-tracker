@@ -1,13 +1,6 @@
-"""Published daily micronutrient reference amounts for nonpregnant people.
-
-Age/sex intakes: NIH and Health Canada reference tables linked below.
-"""
 
 AGE_BAND_ENDS = (3, 8, 13, 18, 30, 50, 70)
 
-# Each age-band value is (male, female), from ages 1-3 through 71+.
-##List the 29 tracked micronutrients with personal age/sex values.
-##Sodium uses a daily limit.
 MICRONUTRIENTS = (
     ("Vitamin A", "mcg RAE", 900, ((300, 300), (400, 400), (600, 600), (900, 700), (900, 700), (900, 700), (900, 700), (900, 700)), "https://ods.od.nih.gov/factsheets/VitaminA-Consumer/"),
     ("Thiamin (B1)", "mg", 1.2, ((0.5, 0.5), (0.6, 0.6), (0.9, 0.9), (1.2, 1.0), (1.2, 1.1), (1.2, 1.1), (1.2, 1.1), (1.2, 1.1)), "https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/dietary-reference-intakes/tables/reference-values-vitamins.html"),
@@ -41,8 +34,59 @@ MICRONUTRIENTS = (
 )
 
 
-##Pregnancy values are NIH ODS RDAs/AIs for ages 14-18, 19-30, and 31-50.
 PREGNANCY_SOURCE = "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/"
+CONDITION_MICRONUTRIENTS = {
+    "pregnancy": {
+        "label": "Pregnancy",
+        "source": PREGNANCY_SOURCE,
+        "summary": "Pregnancy reference targets are applied automatically. Review prenatal nutrition with your care team, including folate, iron, iodine, choline, vitamin D, and calcium.",
+        "nutrients": {
+            "Folate (B9)": "Supports early neural tube development; the published pregnancy reference is 600 mcg DFE/day.",
+            "Iron": "Needs rise with blood volume and fetal development; the published pregnancy reference is 27 mg/day.",
+            "Iodine": "Supports thyroid function and fetal development; the published pregnancy reference is 220 mcg/day.",
+            "Choline": "Supports fetal development; the published pregnancy reference is 450 mg/day.",
+            "Vitamin D": "Supports calcium absorption and bone health; the pregnancy reference remains 15 mcg/day.",
+            "Calcium": "Supports bone health; pregnancy uses 1,300 mg/day for ages 14–18 and 1,000 mg/day for adults.",
+        },
+    },
+    "diabetes": {
+        "label": "Diabetes",
+        "source": "https://diabetesjournals.org/care/article/49/Supplement_1/S50/163924/3-Prevention-or-Delay-of-Diabetes-and-Associated",
+        "summary": "If you take metformin long term, discuss periodic vitamin B12 testing with your clinician. Diabetes alone does not set a higher B12 intake target here.",
+        "nutrients": {
+            "Vitamin B12": "Long-term metformin use can affect B12 status. Food intake progress cannot show whether B12 absorption or blood levels are adequate.",
+        },
+    },
+    "ibs": {
+        "label": "IBS",
+        "source": "https://www.monashfodmap.com/blog/research-update-occurrence-micronutrient-deficiencies-ibs/",
+        "summary": "Restrictive IBS diets can leave gaps in calcium, iron, folate, thiamin, riboflavin, and magnesium. These keep their usual reference targets; a dietitian can help maintain adequate intake while managing symptoms.",
+        "nutrients": {
+            "Calcium": "Pay attention to calcium adequacy if you restrict dairy; suitable fortified alternatives can help.",
+            "Iron": "Restrictive IBS diets can reduce iron intake; review adequacy against your personal target.",
+            "Folate (B9)": "Restrictive IBS diets can reduce folate intake; review adequacy against your personal target.",
+            "Thiamin (B1)": "Restrictive IBS diets can reduce thiamin intake; review adequacy against your personal target.",
+            "Riboflavin (B2)": "Restrictive IBS diets can reduce riboflavin intake; review adequacy against your personal target.",
+            "Magnesium": "Restrictive IBS diets can reduce magnesium intake; review adequacy against your personal target.",
+        },
+    },
+    "menstruation": {
+        "label": "Periods / menstruation",
+        "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
+        "summary": "Menstrual blood loss makes iron intake worth watching. The female reference already uses 15 mg/day at ages 14–18 and 18 mg/day at ages 19–50; selecting periods does not add another increase. If your UserInfo reference does not fit your menstrual status, ask your clinician for a personal iron target. Heavy periods warrant assessment for iron deficiency.",
+        "nutrients": {
+            "Iron": "Menstrual bleeding increases iron losses. Your age/sex reference or saved personal target is used; heavy bleeding needs clinical assessment.",
+            "Vitamin C": "Vitamin C helps absorb iron from plant foods. Its usual intake target is retained.",
+        },
+    },
+}
+
+
+def condition_micronutrient_guidance(conditions):
+    return [profile for condition, profile in CONDITION_MICRONUTRIENTS.items()
+            if condition in (conditions or [])]
+
+
 PREGNANCY_TARGETS = {
     "Vitamin A": (750, 770, 770),
     "Thiamin (B1)": (1.4, 1.4, 1.4),
@@ -75,7 +119,6 @@ PREGNANCY_TARGETS = {
 }
 
 
-##Choose the right age band, sex, and pregnancy reference values.
 def micronutrient_targets(age, sex, pregnant=False):
     if age < 1 or sex not in ("male", "female"):
         raise ValueError("Enter an age of at least 1 and select male or female.")

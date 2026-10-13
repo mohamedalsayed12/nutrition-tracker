@@ -1,14 +1,17 @@
-"""Match USDA FoodData Central nutrients to saved personal targets."""
 
-import math
-import re
+from imports import math, re
 
 
 def _name(value):
     return re.sub(r"[^a-z0-9]+", " ", str(value).lower()).strip()
 
 
-##Match USDA nutrient names to the names used in the personal target table.
+def nutrient_per_100_calories(nutrient, calorie):
+    if calorie <= 0:
+        raise ValueError("Calories have to be greater than zero")
+    return nutrient / calorie * 100
+
+
 def _target_name(value):
     name = _name(value)
     if name.startswith("vitamin a ") and ("rae" in name or "retinol activity equivalent" in name):
@@ -49,7 +52,6 @@ def _unit(value):
     return str(value).lower().strip().replace("µ", "u").replace("μ", "u").replace("�", "u")
 
 
-##Convert reported gram, milligram, and microgram amounts before comparison.
 def _convert(amount, source_unit, target_unit):
     try:
         amount = float(amount)
@@ -67,7 +69,6 @@ def _convert(amount, source_unit, target_unit):
     return milligrams if target == "mg" else milligrams * 1000
 
 
-##Only count nutrients that the food record reports with a usable amount.
 def matched_micronutrients(nutrients, targets, amount_field):
     target_by_name = {item["name"]: item for item in targets}
     matched = {}
@@ -81,7 +82,6 @@ def matched_micronutrients(nutrients, targets, amount_field):
     return matched
 
 
-##Find the food's kcal value so NPC can rate nutrients per calorie.
 def _energy_per_100g(nutrients):
     candidates = []
     for nutrient in nutrients or ():
@@ -97,15 +97,7 @@ def _energy_per_100g(nutrients):
     return min(candidates)[1] if candidates else None
 
 
-##Rate reported micronutrient density against UserInfo targets and explain the score.
 def npc_rating(nutrients, targets, daily_calories, npc):
-    """Return a 0-100 micronutrient-density rating and human-readable reasons.
-
-    A score of 50 means the food supplies the target micronutrients at
-    roughly the density required by the person's daily calorie target. Each
-    nutrient is capped at twice that density before the values are averaged.
-    Unreported micronutrients earn no points, and are called out explicitly.
-    """
     if not targets or not daily_calories or daily_calories <= 0:
         return {"score": None, "reasons": ["Calculate your UserInfo targets to rate this food."]}
     energy = _energy_per_100g(nutrients)
@@ -139,7 +131,6 @@ def npc_rating(nutrients, targets, daily_calories, npc):
     return {"score": max(0, min(score, 100)), "reasons": reasons}
 
 
-##Sum today's logged nutrients and show what is needed or left under a limit.
 def remaining_targets(food_logs, targets):
     totals = {item["name"]: 0.0 for item in targets}
     reported = {item["name"]: 0 for item in targets}
@@ -153,7 +144,9 @@ def remaining_targets(food_logs, targets):
         known = reported[name] > 0 or not food_logs
         logged = round(totals[name], 2) if known else None
         limit = item.get("direction") == "maximum"
+        percent = round(totals[name] / item["target"] * 100, 1) if known and item["target"] > 0 else None
         rows.append({"name": name, "unit": item["unit"], "target": item["target"], "limit": limit,
                      "logged": logged, "remaining": round(max(item["target"] - totals[name], 0), 2) if known else None,
+                     "percent": percent, "bar_width": min(percent, 100) if percent is not None else 0,
                      "partial": 0 < reported[name] < len(food_logs)})
     return rows

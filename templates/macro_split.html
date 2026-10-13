@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}Macro split settings{% endblock %}
+{% block content %}
+<section style="max-width: 680px; margin: 0 auto;">
+  <h1>Macro split settings</h1>
+  <p>Choose the percentage of your daily calories from carbohydrates, protein, and fat. The three percentages must total 100%.</p>
+  {% if calorie_target is not none %}
+    <p>Current daily calorie target: {{ calorie_target }} kcal.</p>
+  {% else %}
+    <p>Your split will be saved now. Gram targets will appear after you set a daily calorie target.</p>
+  {% endif %}
+  {% if overridden_macros %}<p>Your medical condition setting includes personal {{ overridden_macros|join(', ') }} target{{ 's' if overridden_macros|length > 1 else '' }} in grams. Those amounts take precedence over the percentages shown here; the remaining calorie budget is divided among macros without personal gram targets.</p>{% endif %}
+  <form method="post">
+    <input type="hidden" name="_macro_token" value="{{ token }}">
+    <p><label>Carbohydrates (%) <input type="number" name="carbs_percent" min="0" max="100" step="0.1" required value="{{ values.carbs }}"></label></p>
+    <p><label>Protein (%) <input type="number" name="protein_percent" min="0" max="100" step="0.1" required value="{{ values.protein }}"></label></p>
+    <p><label>Fat (%) <input type="number" name="fat_percent" min="0" max="100" step="0.1" required value="{{ values.fat }}"></label></p>
+    {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+    <button type="submit" name="action" value="save">Save macro split</button>
+    {% if split %}<button type="submit" name="action" value="default" formnovalidate>Use calculator defaults</button>{% endif %}
+  </form>
+  <p><a href="{{ url_for('home_page') }}">Back to homepage</a></p>
+</section>
+{% endblock %}

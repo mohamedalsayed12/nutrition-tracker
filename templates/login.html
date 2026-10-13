@@ -101,13 +101,11 @@ a:hover {
 
 
 <form method="post">
+    {{ form.hidden_tag() }}
     <center style="color: #ff3b3b; border-radius: 20px;">{{message}}</center>
     <br>
 
-  <div class="imgcontainer">
-    <img src="{{ url_for('static', filename='images/b1.jpg') }}" alt="Avatar" class="avatar">
-  </div>
-  <h1 >login form</h1>
+  <h1 >Login</h1>
 
   <div class="container">
     <label for="uname"><b>Email</b></label>
@@ -123,12 +121,12 @@ a:hover {
     </div>
 
     <br>
-        
+
     <button type="submit">Login</button>
   </div>
   <br><br>
   <div class="container">  
-    <span class="psw"><a href="{{ url_for('registration_page') }}">Register now</a></span>
+    <span class="psw"><a href="{{ url_for('auth.registration_page') }}">Register now</a></span>
   </div>
 </form>
 
@@ -140,17 +138,17 @@ a:hover {
     }
 
 
-    
+
         function togglePassword() {
             const passwordInput = document.getElementById("password");
             const toggleBtn = document.querySelector(".toggle-btn");
 
             if (passwordInput.type === "password") {
                 passwordInput.type = "text";
-                toggleBtn.textContent = "🙈";  // Change icon to "hide"
+                toggleBtn.textContent = "🙈";
             } else {
                 passwordInput.type = "password";
-                toggleBtn.textContent = "👁️";  // Change icon to "show"
+                toggleBtn.textContent = "👁️";
             }
         }
 </script>
