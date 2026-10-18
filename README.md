@@ -9,7 +9,7 @@ The layout follows the social media FastAPI project's separation of responsibili
 | Module | Responsibility |
 | --- | --- |
 | `main.py` | Application factory and extension initialization. |
-| `app.py` | One line compatibility entry point exposing the factory. |
+| `app.py` | WSGI entry point for Vercel and a factory import for Flask tools. |
 | `config.py` | Environment settings and PostgreSQL connection URL. |
 | `database.py` | SQLAlchemy ORM, database initialization, and Flask-Migrate. |
 | `models.py` | Persistent user and nutrition models. |
@@ -21,7 +21,7 @@ The layout follows the social media FastAPI project's separation of responsibili
 | `services/` | Nutrition calculations, external integrations, and application operations. |
 | `migrations/` | Versioned Alembic migrations through Flask-Migrate. |
 | `tests/conftest.py` | Isolated application, database, and authentication fixtures. |
-| `.github/workflows/build-deploy.yml` | PostgreSQL tests and optional Docker publishing. |
+| `.github/workflows/build-deploy.yml` | PostgreSQL tests, optional Docker publishing, and gated Vercel deployment. |
 
 The request flow is: router → Pydantic schema → service → SQLAlchemy model → PostgreSQL. JWT authentication checks that the token's user still exists. Resource queries always include the signed-in user's ID.
 
@@ -113,7 +113,30 @@ SQLAlchemy binds query values separately from SQL. User input is never interpola
 
 Tests use a dedicated PostgreSQL database named `nutrition_test` by default, using the connection settings from `.env`. Create it once with `docker compose exec -T database createdb -U nutrition nutrition_test`. You can instead provide `TEST_DATABASE_URL` pointing to another dedicated database whose name ends in `_test`. Tests create and remove its application tables. Never use your application database as the test database. CI starts PostgreSQL 16, applies migrations, and runs the suite against its test database.
 
-Docker publishing is optional: set the repository variable `PUBLISH_DOCKER_IMAGE=true` and production environment secrets `DOCKER_HUB_USERNAME` and `DOCKER_HUB_ACCESS_TOKEN`. Successful main branch builds then publish `<username>/nutrition-tracker:latest`. No hosting deployment target is configured.
+Docker publishing is optional: set the repository variable `PUBLISH_DOCKER_IMAGE=true` and production environment secrets `DOCKER_HUB_USERNAME` and `DOCKER_HUB_ACCESS_TOKEN`. Successful main branch builds then publish `<username>/nutrition-tracker:latest`.
+
+## Vercel deployment
+
+Vercel runs the Flask `app` exported from `app.py` with Python 3.14. The deployment job runs after the PostgreSQL test job succeeds, applies Alembic migrations to the hosted database, and deploys the application. Vercel's automatic Git deployment is disabled in `vercel.json` so the GitHub Actions test gate controls production deployment.
+
+Connect a hosted PostgreSQL database to the Vercel project for the production environment. The Neon integration provides `DATABASE_URL` to the project. The local Docker database at `127.0.0.1` is not reachable from Vercel or GitHub Actions. The deployment job reads the production database URL through Vercel CLI when it runs migrations, so the database must allow connections from GitHub Actions as well.
+
+Create a GitHub Actions environment named `deployment` and add these environment secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `VERCEL_TOKEN` | Vercel API token used by the deployment job. |
+| `VERCEL_ORG_ID` | Vercel account or team ID from the linked project's `.vercel/project.json`. |
+| `VERCEL_PROJECT_ID` | Vercel project ID from the same file. |
+| `SECRET_KEY` | Random Flask session signing key, separate from local development. |
+| `JWT_SECRET_KEY` | Random JWT signing key, separate from the Flask key. |
+| `FDC_API_KEY` | USDA FoodData Central API key for food search and logging. |
+| `API_NINJAS_KEY` | API Ninjas key for exercise search, if used. |
+| `FRONTEND_ORIGIN` | Allowed frontend origin for CORS, when a frontend is available. |
+
+The workflow passes application settings to Vercel as deployment environment variables. `DATABASE_URL` stays in the Vercel integration rather than being duplicated in GitHub secrets. Once the database is connected to the project and the secrets are ready, set the repository variable `ENABLE_VERCEL_DEPLOY=true`. Pushes to `main` then deploy after tests pass. The job is skipped until that variable is set.
+
+The Vercel CLI also ignores `.env`, `instance/`, and tests through `.vercelignore`. Do not commit production credentials.
 
 ## Framework references
 
