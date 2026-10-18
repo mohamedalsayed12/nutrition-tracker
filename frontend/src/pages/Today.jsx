@@ -203,6 +203,7 @@ export default function Today() {
                       <span>
                         {item.activity}
                         {item.duration_minutes != null && ` · ${formatNumber(item.duration_minutes, 0)} min`}
+                        {item.intensity && ` · ${item.intensity}`}
                       </span>
                       <strong>
                         {item.calories_burned != null ? `${formatNumber(item.calories_burned)} kcal` : '—'}

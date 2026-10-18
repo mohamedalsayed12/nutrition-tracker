@@ -1,24 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, clearToken } from '../api'
 import { formatNumber } from '../lib/format'
 
-const ACTIVITY_TYPES = [
-  ['walking', 'Walking'],
-  ['running', 'Running'],
-  ['cycling', 'Cycling'],
-  ['swimming', 'Swimming'],
-  ['strength', 'Strength'],
-  ['yoga', 'Yoga'],
-  ['other_light', 'Other light'],
-  ['other_moderate', 'Other moderate'],
-  ['other_vigorous', 'Other vigorous'],
+const INTENSITIES = [
+  ['easy', 'Easy'],
+  ['medium', 'Medium'],
+  ['hard', 'Hard'],
 ]
 
 const INITIAL = {
-  activity: '',
-  activity_type: 'walking',
+  query: '',
   duration_minutes: 30,
+  intensity: 'medium',
   weight_kg: 70,
   height_cm: 170,
   extra: true,
@@ -27,8 +21,13 @@ const INITIAL = {
 export default function AddExercise() {
   const navigate = useNavigate()
   const [form, setForm] = useState(INITIAL)
+  const [results, setResults] = useState([])
+  const [selected, setSelected] = useState(null)
+  const [estimate, setEstimate] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [estimating, setEstimating] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -60,20 +59,97 @@ export default function AddExercise() {
 
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }))
+    if (field !== 'extra') setEstimate(null)
   }
+
+  useEffect(() => {
+    const query = form.query.trim()
+    if (query.length < 2) {
+      setResults([])
+      return undefined
+    }
+    const handle = window.setTimeout(async () => {
+      setSearching(true)
+      setError('')
+      try {
+        const data = await api.searchExercises(query, {
+          duration: form.duration_minutes,
+          weight_kg: form.weight_kg,
+        })
+        setResults(data.exercises || [])
+      } catch (err) {
+        setError(err.message)
+        setResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 280)
+    return () => window.clearTimeout(handle)
+  }, [form.query, form.duration_minutes, form.weight_kg])
+
+  useEffect(() => {
+    if (!selected) {
+      setEstimate(null)
+      return undefined
+    }
+    let active = true
+    const handle = window.setTimeout(async () => {
+      setEstimating(true)
+      setError('')
+      try {
+        const data = await api.estimateExercise({
+          activity: selected.name,
+          duration_minutes: Number(form.duration_minutes),
+          intensity: form.intensity,
+          weight_kg: Number(form.weight_kg),
+          height_cm: Number(form.height_cm),
+        })
+        if (active) setEstimate(data)
+      } catch (err) {
+        if (active) {
+          setEstimate(null)
+          setError(err.message)
+        }
+      } finally {
+        if (active) setEstimating(false)
+      }
+    }, 200)
+    return () => {
+      active = false
+      window.clearTimeout(handle)
+    }
+  }, [selected, form.duration_minutes, form.intensity, form.weight_kg, form.height_cm])
+
+  function chooseExercise(item) {
+    setSelected(item)
+    setForm((current) => ({ ...current, query: item.name }))
+    setResults([])
+  }
+
+  function clearSelection() {
+    setSelected(null)
+    setEstimate(null)
+  }
+
+  const previewKcal = useMemo(() => {
+    if (estimate?.calories_burned != null) return estimate.calories_burned
+    if (selected?.total_calories != null && form.intensity === 'medium') return selected.total_calories
+    return null
+  }, [estimate, selected, form.intensity])
 
   async function save(event) {
     event.preventDefault()
+    if (!selected) {
+      setError('Pick one exercise from the search results.')
+      return
+    }
     setBusy(true)
     setError('')
     try {
-      const label = form.activity.trim()
-        || ACTIVITY_TYPES.find(([value]) => value === form.activity_type)?.[1]
-        || 'Exercise'
       await api.createActivityLog({
-        activity: label,
-        activity_type: form.activity_type,
+        activity: selected.name,
         duration_minutes: Number(form.duration_minutes),
+        intensity: form.intensity,
         weight_kg: Number(form.weight_kg),
         height_cm: Number(form.height_cm),
         extra: Boolean(form.extra),
@@ -96,23 +172,71 @@ export default function AddExercise() {
         <form className="goals-form" onSubmit={save}>
           <section className="card">
             <label>
-              Activity name
+              Search exercise
               <input
-                value={form.activity}
-                onChange={(e) => update('activity', e.target.value)}
-                placeholder="Morning walk"
-                maxLength={200}
+                value={form.query}
+                onChange={(e) => {
+                  update('query', e.target.value)
+                  if (selected && e.target.value !== selected.name) clearSelection()
+                }}
+                placeholder="Running, cycling, yoga…"
+                maxLength={80}
+                autoComplete="off"
               />
             </label>
 
-            <label className="field-label">Type</label>
-            <div className="chip-row wrap-chips">
-              {ACTIVITY_TYPES.map(([value, label]) => (
+            {searching && <p className="muted">Searching API Ninjas…</p>}
+
+            {!selected && results.length > 0 && (
+              <ul className="result-list exercise-results">
+                {results.map((item) => (
+                  <li key={item.name}>
+                    <button type="button" onClick={() => chooseExercise(item)}>
+                      <span>{item.name}</span>
+                      <small>
+                        {item.total_calories != null
+                          ? `${formatNumber(item.total_calories)} kcal · ${formatNumber(item.duration_minutes, 0)} min`
+                          : 'Tap to select'}
+                      </small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {selected && (
+              <div className="selected-exercise">
+                <div>
+                  <p className="density-label">Selected</p>
+                  <strong>{selected.name}</strong>
+                </div>
+                <button type="button" className="text-btn" onClick={clearSelection}>Change</button>
+              </div>
+            )}
+
+            <label>
+              Duration (minutes)
+              <input
+                type="number"
+                min="1"
+                max="1440"
+                step="1"
+                value={form.duration_minutes}
+                onChange={(e) => update('duration_minutes', e.target.value)}
+                required
+              />
+            </label>
+
+            <label className="field-label">Intensity</label>
+            <div className="segmented" role="radiogroup" aria-label="Intensity">
+              {INTENSITIES.map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
-                  className={`chip ${form.activity_type === value ? 'is-active' : ''}`}
-                  onClick={() => update('activity_type', value)}
+                  role="radio"
+                  aria-checked={form.intensity === value}
+                  className={form.intensity === value ? 'is-active' : ''}
+                  onClick={() => update('intensity', value)}
                 >
                   {label}
                 </button>
@@ -120,18 +244,6 @@ export default function AddExercise() {
             </div>
 
             <div className="triple-grid">
-              <label>
-                Minutes
-                <input
-                  type="number"
-                  min="1"
-                  max="1440"
-                  step="1"
-                  value={form.duration_minutes}
-                  onChange={(e) => update('duration_minutes', e.target.value)}
-                  required
-                />
-              </label>
               <label>
                 Weight kg
                 <input
@@ -155,6 +267,14 @@ export default function AddExercise() {
                   required
                 />
               </label>
+              <label>
+                Burn
+                <input
+                  value={estimating ? '…' : previewKcal != null ? `${formatNumber(previewKcal)} kcal` : '—'}
+                  readOnly
+                  aria-live="polite"
+                />
+              </label>
             </div>
 
             <label className="check-row">
@@ -166,15 +286,14 @@ export default function AddExercise() {
               <span>Count toward today’s calorie target</span>
             </label>
             <p className="muted hint-line">
-              Estimated burn uses your weight, height, age, and activity type
-              (~{formatNumber(form.duration_minutes, 0)} min).
+              Calories come from API Ninjas for your duration. Choose one exercise and one intensity.
             </p>
           </section>
 
           {error && <p className="banner-error">{error}</p>}
 
-          <button className="btn-green" type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Log exercise'}
+          <button className="btn-green" type="submit" disabled={busy || !selected}>
+            {busy ? 'Saving…' : previewKcal != null ? `Log · ${formatNumber(previewKcal)} kcal` : 'Log exercise'}
           </button>
         </form>
       )}

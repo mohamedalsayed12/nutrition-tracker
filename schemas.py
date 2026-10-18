@@ -57,12 +57,25 @@ class FoodLogCreate(InputModel):
 
 
 class ActivityLogCreate(InputModel):
+    """Log a single exercise with one intensity (easy / medium / hard).
+
+    Calories burned come from API Ninjas for the given duration when configured.
+    """
+
     activity: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-    activity_type: Literal["walking", "running", "cycling", "swimming", "strength", "yoga", "other_light", "other_moderate", "other_vigorous"]
     duration_minutes: float = Field(gt=0, le=1440)
+    intensity: Literal["easy", "medium", "hard"]
     weight_kg: float = Field(ge=10, le=500)
     height_cm: float = Field(ge=50, le=300)
     extra: bool = Field(default=False, strict=True)
+
+
+class ExerciseEstimateInput(InputModel):
+    activity: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    duration_minutes: float = Field(gt=0, le=1440)
+    intensity: Literal["easy", "medium", "hard"]
+    weight_kg: float = Field(ge=10, le=500)
+    height_cm: float | None = Field(default=None, ge=50, le=300)
 
 
 class CalorieGoal(InputModel):

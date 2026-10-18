@@ -62,6 +62,13 @@ export const api = {
   activityLogs: () => request('/api/v1/activity-logs?per_page=100'),
   createActivityLog: (payload) => request('/api/v1/activity-logs', { method: 'POST', body: payload }),
   deleteActivityLog: (id) => request(`/api/v1/activity-logs/${id}`, { method: 'DELETE' }),
+  searchExercises: (q, { duration, weight_kg } = {}) => {
+    const params = new URLSearchParams({ q })
+    if (duration != null) params.set('duration', String(duration))
+    if (weight_kg != null) params.set('weight_kg', String(weight_kg))
+    return request(`/api/v1/exercises?${params}`)
+  },
+  estimateExercise: (payload) => request('/api/v1/exercises/estimate', { method: 'POST', body: payload }),
 
   getHealth: () => request('/api/v1/settings/health'),
   setHealth: (payload) => request('/api/v1/settings/health', { method: 'PUT', body: payload }),

@@ -7,11 +7,12 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from database import db
 from models import CalorieTarget, HealthPreferences, NutritionTargets
-from schemas import VoiceParseInput, validate_body
+from schemas import ExerciseEstimateInput, VoiceParseInput, validate_body
 from services.barcode_lookup import lookup_barcode
 from services.calc import configured_micronutrients, food_measures, scaled_food_nutrients
 from services.condition_days import day_condition_list
-from services.food_search import get_food_client, search_exercises, search_foods
+from services.exercise_ninjas import estimate_ninjas_calories, search_exercise_options
+from services.food_search import get_food_client, search_foods
 from services.nutrient_scoring import food_nutrient_density
 from services.voice_parse import parse_voice_log
 
@@ -108,5 +109,36 @@ def measures(fdc_id):
 
 
 @router.get("/exercises")
+@jwt_required(optional=True)
 def exercises():
-    return jsonify(exercises=search_exercises(request.args.get("q", "").strip()))
+    query = request.args.get("q", "").strip()
+    try:
+        duration = float(request.args.get("duration") or 30)
+        weight = float(request.args.get("weight_kg") or 70)
+    except (TypeError, ValueError):
+        abort(400, description="duration and weight_kg must be numbers.")
+    duration = max(1.0, min(1440.0, duration))
+    weight = max(10.0, min(500.0, weight))
+    return jsonify(exercises=search_exercise_options(query, duration_minutes=duration, weight_kg=weight))
+
+
+@router.post("/exercises/estimate")
+@jwt_required()
+@validate_body(ExerciseEstimateInput)
+def exercise_estimate(data):
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity else None
+    nutrition = db.session.get(NutritionTargets, user_id) if user_id else None
+    try:
+        estimate = estimate_ninjas_calories(
+            activity=data.activity,
+            duration_minutes=data.duration_minutes,
+            weight_kg=data.weight_kg,
+            intensity=data.intensity,
+            age=nutrition.age if nutrition else None,
+            sex=nutrition.sex if nutrition else None,
+            height_cm=data.height_cm,
+        )
+    except ValueError as error:
+        abort(400, description=str(error))
+    return jsonify(estimate)

@@ -1,7 +1,6 @@
 import os
 import re
 
-import requests
 from flask import abort
 from usda_fdc import FdcClient, FdcResourceNotFoundError
 
@@ -75,17 +74,7 @@ def search_foods(query, user_id=None):
 
 
 def search_exercises(query):
-    if len(query) < 2:
-        return []
-    if len(query) > 80:
-        abort(400, description="Search is too long.")
-    api_key = os.getenv("API_NINJAS_KEY")
-    if not api_key:
-        abort(503, description="Exercise search is not configured.")
-    try:
-        response = requests.get("https://api.api-ninjas.com/v1/exercises",
-                                params={"name": query}, headers={"X-Api-Key": api_key}, timeout=5)
-        response.raise_for_status()
-        return [item["name"] for item in response.json()]
-    except (requests.RequestException, ValueError, KeyError, TypeError):
-        abort(502, description="Exercise search is temporarily unavailable.")
+    """Backward-compatible name list; prefer search_exercise_options."""
+    from services.exercise_ninjas import search_exercise_options
+
+    return [item["name"] for item in search_exercise_options(query)]

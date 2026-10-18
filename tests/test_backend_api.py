@@ -101,8 +101,11 @@ def test_activity_logs_require_nutrition_setup_and_respect_owner(client):
     first = register_and_login(client, "first@example.com")
     second = register_and_login(client, "second@example.com")
     payload = {
-        "activity": "Walk outdoors", "activity_type": "walking",
-        "duration_minutes": 30, "weight_kg": 75, "height_cm": 175,
+        "activity": "walking",
+        "duration_minutes": 30,
+        "intensity": "medium",
+        "weight_kg": 75,
+        "height_cm": 175,
     }
     assert client.post("/api/v1/activity-logs", json=payload, headers=first).status_code == 409
     setup = client.put("/api/v1/goals/nutrition", json={

@@ -7,7 +7,8 @@ from usda_fdc import FdcResourceNotFoundError
 from database import db
 from models import (ActivityLog, ExerciseDetails, ExerciseTargetCredit, FoodLog,
                     HealthPreferences, NutritionTargets, SavedEatingDay, UserActivityBaseline)
-from services.calc import EXERCISE_METS, active_exercise_calories, estimate_exercise_calories, scaled_food_nutrients
+from services.calc import active_exercise_calories, scaled_food_nutrients
+from services.exercise_ninjas import estimate_ninjas_calories
 from services.food_search import get_food_client
 
 
@@ -50,20 +51,46 @@ def activity_values(user_id, data):
     preferences = db.session.get(HealthPreferences, user_id)
     if data.extra and preferences is not None and preferences.custom_calories is not None:
         abort(409, description="A fixed calorie target cannot receive exercise credit.")
-    burned = estimate_exercise_calories(data.duration_minutes, data.activity_type, data.weight_kg,
-                                       data.height_cm, nutrition.age, nutrition.sex)
+    try:
+        estimate = estimate_ninjas_calories(
+            activity=data.activity,
+            duration_minutes=data.duration_minutes,
+            weight_kg=data.weight_kg,
+            intensity=data.intensity,
+            age=nutrition.age,
+            sex=nutrition.sex,
+            height_cm=data.height_cm,
+        )
+    except ValueError as error:
+        abort(400, description=str(error))
+    burned = estimate["calories_burned"]
+    activity_type = estimate["activity_type"]
     return dict(
-        activity=data.activity,
-        details=ExerciseDetails(duration_minutes=data.duration_minutes, calories_burned=burned,
-                                activity_type=data.activity_type, met=EXERCISE_METS[data.activity_type][0],
-                                height_cm=data.height_cm, weight_kg=data.weight_kg),
-        target_credit=ExerciseTargetCredit(extra=data.extra,
-                                          active_calories=active_exercise_calories(burned, data.activity_type)),
+        activity=estimate["matched_name"] or data.activity,
+        details=ExerciseDetails(
+            duration_minutes=data.duration_minutes,
+            calories_burned=burned,
+            activity_type=activity_type,
+            met=estimate["met"],
+            height_cm=data.height_cm,
+            weight_kg=data.weight_kg,
+        ),
+        target_credit=ExerciseTargetCredit(
+            extra=data.extra,
+            active_calories=active_exercise_calories(burned, activity_type),
+        ),
+        estimate=estimate,
     )
 
 
 def create_activity(user_id, data):
-    log = ActivityLog(user_id=user_id, **activity_values(user_id, data))
+    values = activity_values(user_id, data)
+    log = ActivityLog(
+        user_id=user_id,
+        activity=values["activity"],
+        details=values["details"],
+        target_credit=values["target_credit"],
+    )
     db.session.add(log)
     db.session.commit()
     return log
@@ -91,12 +118,27 @@ def serialize_food(log):
                 grams=log.grams, nutrients=log.nutrients, logged_at=iso_utc(log.logged_at))
 
 
+_ACTIVITY_TYPE_TO_INTENSITY = {
+    "other_light": "easy",
+    "other_moderate": "medium",
+    "other_vigorous": "hard",
+    "walking": "easy",
+    "yoga": "easy",
+    "strength": "medium",
+    "cycling": "medium",
+    "swimming": "medium",
+    "running": "hard",
+}
+
+
 def serialize_activity(log):
+    activity_type = log.details.activity_type if log.details else None
     return dict(
         id=log.id, activity=log.activity, logged_at=iso_utc(log.logged_at),
         duration_minutes=log.details.duration_minutes if log.details else None,
         calories_burned=log.details.calories_burned if log.details else None,
-        activity_type=log.details.activity_type if log.details else None,
+        activity_type=activity_type,
+        intensity=_ACTIVITY_TYPE_TO_INTENSITY.get(activity_type),
         extra=log.target_credit.extra if log.target_credit else False,
     )
 
