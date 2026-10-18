@@ -38,6 +38,8 @@ def _target_name(value):
         return "Folate (B9)"
     if name == "vitamin e" or name.startswith("vitamin e alpha tocopherol"):
         return "Vitamin E"
+    if "menaquinone" in name or name in ("vitamin k2", "vitamin k 2") or name.startswith("vitamin k2 "):
+        return "Vitamin K2"
     if name == "vitamin k" or name.startswith("vitamin k phylloquinone"):
         return "Vitamin K"
     if name in ("choline", "choline total"):
@@ -131,7 +133,9 @@ def npc_rating(nutrients, targets, daily_calories, npc):
     return {"score": max(0, min(score, 100)), "reasons": reasons}
 
 
-def remaining_targets(food_logs, targets):
+def remaining_targets(food_logs, targets, include_food_advice=True):
+    from services.food_recommendations import attach_food_recommendations
+
     totals = {item["name"]: 0.0 for item in targets}
     reported = {item["name"]: 0 for item in targets}
     for log in food_logs:
@@ -145,8 +149,15 @@ def remaining_targets(food_logs, targets):
         logged = round(totals[name], 2) if known else None
         limit = item.get("direction") == "maximum"
         percent = round(totals[name] / item["target"] * 100, 1) if known and item["target"] > 0 else None
-        rows.append({"name": name, "unit": item["unit"], "target": item["target"], "limit": limit,
-                     "logged": logged, "remaining": round(max(item["target"] - totals[name], 0), 2) if known else None,
-                     "percent": percent,
-                     "partial": 0 < reported[name] < len(food_logs)})
+        row = {"name": name, "unit": item["unit"], "target": item["target"], "limit": limit,
+               "logged": logged, "remaining": round(max(item["target"] - totals[name], 0), 2) if known else None,
+               "percent": percent,
+               "partial": 0 < reported[name] < len(food_logs),
+               "condition_adjusted": bool(item.get("condition_adjusted")),
+               "custom": bool(item.get("custom"))}
+        if item.get("adjusted_by"):
+            row["adjusted_by"] = list(item["adjusted_by"])
+        rows.append(row)
+    if include_food_advice:
+        return attach_food_recommendations(rows)
     return rows

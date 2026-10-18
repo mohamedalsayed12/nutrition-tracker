@@ -69,12 +69,24 @@ The API container applies migrations before starting Gunicorn on port 8000. `/ap
 | `GET /api/v1/foods/{fdc_id}/measures` | Read serving size conversions. |
 | `GET /api/v1/foods/frequent` | Read your frequently logged foods. |
 | `GET /api/v1/exercises?q=...` | Search exercise names. |
-| `GET /api/v1/reports/daily` | Read daily totals, targets, and exercise credit. |
+| `GET /api/v1/reports/daily` | Read daily totals, targets, exercise credit, active day conditions, and food advice for nutrients below target. |
 | `GET /api/v1/reports/weekly` | Read a seven day nutrition recap. |
+| `GET /api/v1/nutrients/food-recommendations` | Read food suggestions for every tracked micronutrient, including vitamin K2. |
+| `GET`, `PUT`, `DELETE /api/v1/days/{YYYY-MM-DD}/conditions` | Read, replace, or clear day-scoped conditions such as menstruation. |
 | `PUT /api/v1/days/{YYYY-MM-DD}/save` | Save a logged UTC day. |
 | `GET /api/v1/days` | Read saved UTC days. |
 
 Protected routes require `Authorization: Bearer <access_token>`. Food and activity listings accept `page` and `per_page` (maximum 100). Daily reports accept `date=YYYY-MM-DD`; weekly reports accept `week_start=YYYY-MM-DD`. Reports accept an IANA `timezone`, such as `Europe/London`, and default to UTC. Saved days use UTC; changing or deleting food logs reopens their saved day.
+
+Day-scoped conditions currently support `menstruation` (period days). Logging a period day raises that day's iron target by 5 mg and vitamin C by 35 mg above the age/sex reference. Personal micronutrient overrides marked custom are not auto-bumped. The same iron and vitamin C bumps apply when menstruation is enabled as an ongoing condition in `PUT /api/v1/settings/health`. Menstruation requires nutrition sex `female`. Pregnancy and menstruation cannot both be active. Daily reports include `day_conditions`, `active_conditions` (health settings merged with the day log), `condition_guidance`, `nutrient_advice` (foods to eat when a nutrient is below target), and `condition_adjusted` flags on raised micronutrient rows. Weekly reports use ongoing health-preference conditions only.
+
+Micronutrient targets include vitamin K2 (menaquinones) with a practical adult tracking target of 90 mcg/day. NIH/EFSA do not publish a separate K2 DRI, so this value is a tracking goal for food logging rather than an official RDA. Each micronutrient row in the daily report also lists `food_recommendations`; when intake is below the minimum target (or above the sodium limit), `deficient` is true and `advice` names foods that help close the gap.
+
+Day conditions use:
+
+```json
+{"conditions": ["menstruation"]}
+```
 
 Food log creation and replacement use:
 

@@ -9,18 +9,27 @@ from services.nutrient_scoring import remaining_targets
 
 
 class ConditionTargetTest(unittest.TestCase):
-    def test_periods_keep_age_references_and_personal_overrides(self):
+    def test_periods_raise_iron_and_vitamin_c_but_keep_personal_overrides(self):
         preferences = SimpleNamespace(conditions=["menstruation", "ibs", "diabetes"],
                                       micronutrient_overrides={})
-        for age, expected in ((16, 15), (30, 18), (55, 8)):
-            targets = configured_micronutrients(age, "female", preferences)
-            self.assertEqual(targets, micronutrient_targets(age, "female"))
-            self.assertEqual(next(row["target"] for row in targets if row["name"] == "Iron"), expected)
+        for age, base_iron in ((16, 15), (30, 18), (55, 8)):
+            baseline = {row["name"]: row for row in micronutrient_targets(age, "female")}
+            targets = {row["name"]: row for row in configured_micronutrients(age, "female", preferences)}
+            self.assertEqual(targets["Iron"]["target"], base_iron + 5)
+            self.assertEqual(targets["Vitamin C"]["target"], baseline["Vitamin C"]["target"] + 35)
+            self.assertTrue(targets["Iron"]["condition_adjusted"])
+            self.assertTrue(targets["Vitamin C"]["condition_adjusted"])
+            self.assertIn("menstruation", targets["Iron"]["adjusted_by"])
         preferences.micronutrient_overrides = {"Iron": 20}
         targets = configured_micronutrients(30, "female", preferences)
         iron = next(row for row in targets if row["name"] == "Iron")
+        vitamin_c = next(row for row in targets if row["name"] == "Vitamin C")
         self.assertEqual(iron["target"], 20)
         self.assertTrue(iron["custom"])
+        self.assertFalse(iron.get("condition_adjusted"))
+        self.assertEqual(vitamin_c["target"],
+                         next(row["target"] for row in micronutrient_targets(30, "female")
+                              if row["name"] == "Vitamin C") + 35)
 
     def test_pregnancy_targets_and_override_survive_multiple_profiles(self):
         preferences = SimpleNamespace(conditions=["pregnancy", "ibs", "diabetes"],

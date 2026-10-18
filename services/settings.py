@@ -27,6 +27,8 @@ def set_calories(user_id, calories):
 
 def set_health_settings(user_id, data):
     nutrition = require_nutrition(user_id)
+    if "menstruation" in data.conditions and nutrition.sex != "female":
+        raise ValueError("Menstruation is available when nutrition sex is female.")
     targets = micronutrient_targets(nutrition.age, nutrition.sex, pregnant="pregnancy" in data.conditions)
     allowed = {target["name"] for target in targets}
     if not set(data.micronutrient_overrides).issubset(allowed):
@@ -41,6 +43,8 @@ def set_health_settings(user_id, data):
     for name, value in data.model_dump().items():
         setattr(preferences, name, value)
     preferences.conditions = sorted(set(data.conditions))
+    # apply_health_preferences → configured_micronutrients applies menstruation
+    # iron / vitamin C bumps (and pregnancy references) onto stored targets.
     calories = apply_health_preferences(nutrition, preferences)
     validate_care_plan_macros(calories, preferences)
     save_calorie_target(user_id, calories)

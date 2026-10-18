@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 from healthsciencecalculator.get_bmr import get_bmr
 from healthsciencecalculator.get_tdee import get_tdee
-from services.nutrient_targets import micronutrient_targets
+from services.nutrient_targets import apply_condition_target_adjustments, micronutrient_targets
 from services.weekly_recap import food_macros
 
 
@@ -49,15 +49,28 @@ def calculate_goal_targets(info, goal, pregnancy_active):
             round(calories * 0.35 / 4, 1), round(calories * 0.55 / 4, 1))
 
 
-def configured_micronutrients(age, sex, preferences):
-    pregnant = preferences is not None and "pregnancy" in (preferences.conditions or [])
+def merge_condition_lists(*condition_lists):
+    merged = []
+    seen = set()
+    for conditions in condition_lists:
+        for condition in conditions or ():
+            if condition not in seen:
+                seen.add(condition)
+                merged.append(condition)
+    return merged
+
+
+def configured_micronutrients(age, sex, preferences, extra_conditions=None):
+    preference_conditions = (preferences.conditions or []) if preferences is not None else []
+    conditions = merge_condition_lists(preference_conditions, extra_conditions)
+    pregnant = "pregnancy" in conditions
     targets = micronutrient_targets(age, sex, pregnant=pregnant)
     overrides = (preferences.micronutrient_overrides or {}) if preferences is not None else {}
     for target in targets:
         if target["name"] in overrides:
             target["target"] = overrides[target["name"]]
             target["custom"] = True
-    return targets
+    return apply_condition_target_adjustments(targets, conditions)
 
 
 def apply_health_preferences(nutrition, preferences):

@@ -4,8 +4,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from database import db
 from models import ActivityLog, CalorieTarget, FoodLog, HealthPreferences, MacroSplit, NutritionTargets, UserActivityBaseline
 from services.calc import (condition_nutrition_data, configured_micronutrients,
-                           daily_target_progress, frequent_food_choices)
+                           daily_target_progress, frequent_food_choices, merge_condition_lists)
+from services.condition_days import day_condition_list
+from services.food_recommendations import deficiency_advice
 from services.nutrient_scoring import remaining_targets
+from services.nutrient_targets import condition_micronutrient_guidance
 from services.weekly_recap import build_weekly_recap, food_macros
 from services.logs import iso_utc
 
@@ -35,6 +38,9 @@ def daily_report(user_id, day, zone):
     preferences = db.session.get(HealthPreferences, user_id)
     baseline = db.session.get(UserActivityBaseline, user_id)
     split = db.session.get(MacroSplit, user_id)
+    day_conditions = day_condition_list(user_id, day)
+    preference_conditions = list(preferences.conditions or []) if preferences else []
+    active_conditions = merge_condition_lists(preference_conditions, day_conditions)
     credit = 0
     if baseline is not None and not (preferences and preferences.custom_calories is not None):
         credit = round(sum(log.target_credit.active_calories for log in activities
@@ -49,13 +55,32 @@ def daily_report(user_id, day, zone):
         for name, value in food_macros(log.nutrients).items():
             totals[name] += value
             reported[name] += 1
-    micronutrients = configured_micronutrients(nutrition.age, nutrition.sex, preferences) if nutrition else []
-    return dict(date=day.isoformat(), timezone=str(zone), food_log_count=len(foods),
-                totals={name: round(value, 2) for name, value in totals.items()}, reported=reported,
-                calorie_goal=calories, exercise_credit=credit, progress=progress, fat_range=fat_range,
-                custom_macros=custom_macros, protein_min=protein_min, protein_max=protein_max, carbs=carbs,
-                micronutrients=remaining_targets(foods, micronutrients),
-                condition_nutrition=condition_nutrition_data(foods, calories))
+    micronutrients = (
+        configured_micronutrients(nutrition.age, nutrition.sex, preferences, extra_conditions=day_conditions)
+        if nutrition else []
+    )
+    micronutrient_progress = remaining_targets(foods, micronutrients)
+    return dict(
+        date=day.isoformat(),
+        timezone=str(zone),
+        food_log_count=len(foods),
+        totals={name: round(value, 2) for name, value in totals.items()},
+        reported=reported,
+        calorie_goal=calories,
+        exercise_credit=credit,
+        progress=progress,
+        fat_range=fat_range,
+        custom_macros=custom_macros,
+        protein_min=protein_min,
+        protein_max=protein_max,
+        carbs=carbs,
+        micronutrients=micronutrient_progress,
+        nutrient_advice=deficiency_advice(micronutrient_progress),
+        day_conditions=day_conditions,
+        active_conditions=active_conditions,
+        condition_guidance=condition_micronutrient_guidance(active_conditions),
+        condition_nutrition=condition_nutrition_data(foods, calories),
+    )
 
 
 def weekly_report(user_id, week_start, zone):

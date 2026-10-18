@@ -76,8 +76,12 @@ class MacroSplitInput(InputModel):
         return self
 
 
+DAY_SCOPED_CONDITIONS = Literal["menstruation"]
+HEALTH_CONDITIONS = Literal["pregnancy", "diabetes", "ibs", "menstruation"]
+
+
 class HealthSettings(InputModel):
-    conditions: list[Literal["pregnancy", "diabetes", "ibs", "menstruation"]] = Field(default_factory=list)
+    conditions: list[HEALTH_CONDITIONS] = Field(default_factory=list)
     trimester: Literal[1, 2, 3] | None = None
     custom_calories: float | None = Field(default=None, ge=500, le=10000)
     custom_carbs: float | None = Field(default=None, gt=0, le=1500)
@@ -92,6 +96,16 @@ class HealthSettings(InputModel):
         if "pregnancy" in self.conditions and self.trimester is None:
             raise ValueError("Choose a pregnancy trimester.")
         return self
+
+
+class DayConditions(InputModel):
+    """Log conditions that adjust nutrient targets for a single day.
+
+    Currently supports menstruation (period days). Chronic conditions such as
+    pregnancy, diabetes, and IBS belong in health settings.
+    """
+
+    conditions: list[DAY_SCOPED_CONDITIONS] = Field(default_factory=list)
 
 
 class Pagination(InputModel):

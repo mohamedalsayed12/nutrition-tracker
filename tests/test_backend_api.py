@@ -92,3 +92,88 @@ def test_activity_logs_require_nutrition_setup_and_respect_owner(client):
     assert client.get("/api/v1/activity-logs", headers=second).json["total"] == 0
     assert client.delete(f"/api/v1/activity-logs/{response.json['id']}", headers=second).status_code == 404
     assert client.delete(f"/api/v1/activity-logs/{response.json['id']}", headers=first).status_code == 204
+
+
+def _micronutrient_targets(report, *names):
+    return {row["name"]: row for row in report["micronutrients"] if row["name"] in names}
+
+
+def test_period_day_raises_daily_iron_and_vitamin_c_targets(client):
+    headers = register_and_login(client, "period@example.com")
+    setup = client.put("/api/v1/goals/nutrition", json={
+        "age": 30, "sex": "female", "height_cm": 165,
+        "weight_kg": 60, "activity_level": "moderately active", "goal": "maintain",
+    }, headers=headers)
+    assert setup.status_code == 200
+    day = datetime.now(timezone.utc).date().isoformat()
+
+    before = client.get(f"/api/v1/reports/daily?date={day}", headers=headers).json
+    baseline = _micronutrient_targets(before, "Iron", "Vitamin C")
+    assert baseline["Iron"]["target"] == 18
+    assert baseline["Vitamin C"]["target"] == 75
+    assert before["day_conditions"] == []
+
+    logged = client.put(f"/api/v1/days/{day}/conditions", json={"conditions": ["menstruation"]},
+                        headers=headers)
+    assert logged.status_code == 200
+    assert logged.json["conditions"] == ["menstruation"]
+    assert logged.json["guidance"]
+
+    after = client.get(f"/api/v1/reports/daily?date={day}", headers=headers).json
+    raised = _micronutrient_targets(after, "Iron", "Vitamin C")
+    assert raised["Iron"]["target"] == 23
+    assert raised["Vitamin C"]["target"] == 110
+    assert raised["Iron"]["condition_adjusted"] is True
+    assert raised["Vitamin C"]["condition_adjusted"] is True
+    assert after["day_conditions"] == ["menstruation"]
+    assert "menstruation" in after["active_conditions"]
+    assert after["condition_guidance"]
+
+    cleared = client.delete(f"/api/v1/days/{day}/conditions", headers=headers)
+    assert cleared.status_code == 200
+    assert cleared.json["conditions"] == []
+    restored = _micronutrient_targets(
+        client.get(f"/api/v1/reports/daily?date={day}", headers=headers).json, "Iron", "Vitamin C")
+    assert restored["Iron"]["target"] == 18
+    assert restored["Vitamin C"]["target"] == 75
+
+
+def test_period_day_rejects_male_sex_and_pregnancy_conflict(client):
+    male = register_and_login(client, "male@example.com")
+    assert client.put("/api/v1/goals/nutrition", json={
+        "age": 30, "sex": "male", "height_cm": 175,
+        "weight_kg": 75, "activity_level": "moderately active", "goal": "maintain",
+    }, headers=male).status_code == 200
+    day = datetime.now(timezone.utc).date().isoformat()
+    assert client.put(f"/api/v1/days/{day}/conditions", json={"conditions": ["menstruation"]},
+                      headers=male).status_code == 400
+    assert client.put("/api/v1/settings/health", json={"conditions": ["menstruation"]},
+                      headers=male).status_code == 400
+
+    female = register_and_login(client, "pregnant@example.com")
+    assert client.put("/api/v1/goals/nutrition", json={
+        "age": 30, "sex": "female", "height_cm": 165,
+        "weight_kg": 60, "activity_level": "moderately active", "goal": "maintain",
+    }, headers=female).status_code == 200
+    assert client.put("/api/v1/settings/health", json={
+        "conditions": ["pregnancy"], "trimester": 2,
+    }, headers=female).status_code == 200
+    assert client.put(f"/api/v1/days/{day}/conditions", json={"conditions": ["menstruation"]},
+                      headers=female).status_code == 400
+
+
+def test_health_settings_menstruation_persists_raised_micronutrients(client):
+    headers = register_and_login(client, "ongoing-period@example.com")
+    assert client.put("/api/v1/goals/nutrition", json={
+        "age": 30, "sex": "female", "height_cm": 165,
+        "weight_kg": 60, "activity_level": "moderately active", "goal": "maintain",
+    }, headers=headers).status_code == 200
+    response = client.put("/api/v1/settings/health", json={"conditions": ["menstruation"]},
+                          headers=headers)
+    assert response.status_code == 200
+    assert response.json["conditions"] == ["menstruation"]
+    nutrition = client.get("/api/v1/goals/nutrition", headers=headers).json
+    micros = {row["name"]: row for row in nutrition["micronutrients"]}
+    assert micros["Iron"]["target"] == 23
+    assert micros["Vitamin C"]["target"] == 110
+    assert micros["Iron"].get("condition_adjusted") is True

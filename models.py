@@ -105,6 +105,26 @@ class SavedEatingDay(db.Model):
     saved_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
+class ConditionDayLog(db.Model):
+    """Day-scoped medical conditions that adjust nutrient targets for that day.
+
+    Chronic conditions stay in HealthPreferences. Logging menstruation here
+    raises iron and vitamin C targets for the selected UTC day.
+    """
+
+    __tablename__ = "condition_day_logs"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
+    day = db.Column(db.Date, primary_key=True)
+    conditions = db.Column(db.JSON, nullable=False, default=list)
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
 class ActivityLog(db.Model):
     __tablename__ = "activity_logs"
 

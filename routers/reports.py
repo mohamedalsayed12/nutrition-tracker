@@ -6,10 +6,20 @@ from flask_jwt_extended import jwt_required
 from database import db
 from models import FoodLog, SavedEatingDay
 from oauth2 import current_user_id
+from schemas import DayConditions, validate_body
+from services.condition_days import clear_day_conditions, get_day_conditions, set_day_conditions
+from services.food_recommendations import all_nutrient_food_recommendations
 from services.reports import daily_report, day_range, frequent_foods, report_timezone, weekly_report
 
 
 router = Blueprint("reports", __name__)
+
+
+def parse_day(value):
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise ValueError("Use an ISO date: YYYY-MM-DD.") from None
 
 
 def requested_day(zone, name="date"):
@@ -43,10 +53,35 @@ def frequent():
     return jsonify(foods=frequent_foods(current_user_id()))
 
 
+@router.get("/nutrients/food-recommendations")
+@jwt_required()
+def nutrient_food_recommendations():
+    return jsonify(recommendations=all_nutrient_food_recommendations())
+
+
+@router.get("/days/<day>/conditions")
+@jwt_required()
+def day_conditions(day):
+    return jsonify(get_day_conditions(current_user_id(), parse_day(day)))
+
+
+@router.put("/days/<day>/conditions")
+@jwt_required()
+@validate_body(DayConditions)
+def update_day_conditions(day, data):
+    return jsonify(set_day_conditions(current_user_id(), parse_day(day), data))
+
+
+@router.delete("/days/<day>/conditions")
+@jwt_required()
+def delete_day_conditions(day):
+    return jsonify(clear_day_conditions(current_user_id(), parse_day(day)))
+
+
 @router.put("/days/<day>/save")
 @jwt_required()
 def save_day(day):
-    day = date.fromisoformat(day)
+    day = parse_day(day)
     start, end = day_range(day, timezone.utc)
     user_id = current_user_id()
     if not db.session.query(FoodLog.id).filter(FoodLog.user_id == user_id, FoodLog.logged_at >= start, FoodLog.logged_at < end).first():

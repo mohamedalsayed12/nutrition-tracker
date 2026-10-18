@@ -13,6 +13,9 @@ MICRONUTRIENTS = (
     ("Vitamin D", "mcg", 20, ((15, 15), (15, 15), (15, 15), (15, 15), (15, 15), (15, 15), (15, 15), (20, 20)), "https://ods.od.nih.gov/factsheets/VitaminD-Consumer/"),
     ("Vitamin E", "mg", 15, ((6, 6), (7, 7), (11, 11), (15, 15), (15, 15), (15, 15), (15, 15), (15, 15)), "https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/dietary-reference-intakes/tables/reference-values-vitamins.html"),
     ("Vitamin K", "mcg", 120, ((30, 30), (55, 55), (60, 60), (75, 75), (120, 90), (120, 90), (120, 90), (120, 90)), "https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/dietary-reference-intakes/tables/reference-values-vitamins.html"),
+    # Practical tracking targets for menaquinones (K2). NIH/EFSA do not set a separate K2 DRI;
+    # adult values follow common clinical tracking guidance around 90 mcg/day.
+    ("Vitamin K2", "mcg", 90, ((15, 15), (25, 25), (40, 40), (60, 60), (90, 90), (90, 90), (90, 90), (90, 90)), "https://ods.od.nih.gov/factsheets/VitaminK-HealthProfessional/"),
     ("Vitamin B12", "mcg", 2.4, ((0.9, 0.9), (1.2, 1.2), (1.8, 1.8), (2.4, 2.4), (2.4, 2.4), (2.4, 2.4), (2.4, 2.4), (2.4, 2.4)), "https://ods.od.nih.gov/factsheets/VitaminB12-Consumer/"),
     ("Choline", "mg", 550, ((200, 200), (250, 250), (375, 375), (550, 400), (550, 425), (550, 425), (550, 425), (550, 425)), "https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/dietary-reference-intakes/tables/reference-values-vitamins.html"),
     ("Calcium", "mg", 1300, ((700, 700), (1000, 1000), (1300, 1300), (1300, 1300), (1000, 1000), (1000, 1000), (1000, 1200), (1200, 1200)), "https://ods.od.nih.gov/factsheets/Calcium-HealthProfessional/"),
@@ -72,18 +75,49 @@ CONDITION_MICRONUTRIENTS = {
     "menstruation": {
         "label": "Periods / menstruation",
         "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
-        "summary": "Menstrual blood loss makes iron intake worth watching. The female reference already uses 15 mg/day at ages 14–18 and 18 mg/day at ages 19–50; selecting periods does not add another increase. If your UserInfo reference does not fit your menstrual status, ask your clinician for a personal iron target. Heavy periods warrant assessment for iron deficiency.",
+        "summary": "When you log that you are on your period, iron and vitamin C targets rise for that day. The age/sex reference already averages monthly menstrual iron loss; the day-of bump highlights intake while bleeding and uses vitamin C to support nonheme iron absorption. Heavy periods warrant clinical assessment for iron deficiency.",
         "nutrients": {
-            "Iron": "Menstrual bleeding increases iron losses. Your age/sex reference or saved personal target is used; heavy bleeding needs clinical assessment.",
-            "Vitamin C": "Vitamin C helps absorb iron from plant foods. Its usual intake target is retained.",
+            "Iron": "Menstrual bleeding increases iron losses. On logged period days the iron target rises by 5 mg above your age/sex reference (or personal override).",
+            "Vitamin C": "Vitamin C helps absorb iron from plant foods. On logged period days the vitamin C target rises by 35 mg to support iron absorption.",
         },
     },
+}
+
+
+# Day-of-period focus adjustments applied when menstruation is active.
+# Female RDAs already average menstrual iron loss across the month; these
+# raise targets on active bleeding days and pair vitamin C for absorption.
+MENSTRUATION_ADJUSTMENTS = {
+    "Iron": {"add": 5.0, "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/"},
+    "Vitamin C": {"add": 35.0, "source": "https://ods.od.nih.gov/factsheets/VitaminC-Consumer/"},
 }
 
 
 def condition_micronutrient_guidance(conditions):
     return [profile for condition, profile in CONDITION_MICRONUTRIENTS.items()
             if condition in (conditions or [])]
+
+
+def apply_condition_target_adjustments(targets, conditions):
+    """Raise micronutrient targets for active medical conditions.
+
+    Personal overrides already applied by the caller are left unchanged.
+    Returns a new list; does not mutate the input rows in place beyond copies.
+    """
+    active = set(conditions or [])
+    if "menstruation" not in active:
+        return targets
+    adjusted = []
+    for target in targets:
+        row = dict(target)
+        change = MENSTRUATION_ADJUSTMENTS.get(row["name"])
+        if change and not row.get("custom"):
+            row["target"] = round(float(row["target"]) + change["add"], 1)
+            row["condition_adjusted"] = True
+            row["adjusted_by"] = sorted(set(row.get("adjusted_by") or []) | {"menstruation"})
+            row["source"] = change.get("source") or row.get("source")
+        adjusted.append(row)
+    return adjusted
 
 
 PREGNANCY_TARGETS = {
@@ -99,6 +133,7 @@ PREGNANCY_TARGETS = {
     "Vitamin D": (15, 15, 15),
     "Vitamin E": (15, 15, 15),
     "Vitamin K": (75, 90, 90),
+    "Vitamin K2": (90, 90, 90),
     "Vitamin B12": (2.6, 2.6, 2.6),
     "Choline": (450, 450, 450),
     "Calcium": (1300, 1000, 1000),
