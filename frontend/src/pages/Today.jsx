@@ -28,9 +28,10 @@ export default function Today() {
   const [guidance, setGuidance] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setLoading(true)
     setError('')
     try {
       const me = await api.me()
@@ -59,11 +60,43 @@ export default function Today() {
         navigate('/login')
       }
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [navigate])
 
   useEffect(() => { load() }, [load])
+
+  async function removeFood(log) {
+    if (deletingId) return
+    const label = `${log.food_name} (${formatNumber(log.grams, 0)} g)`
+    if (!window.confirm(`Delete ${label} from today’s log?`)) return
+    setDeletingId(`food-${log.id}`)
+    setError('')
+    try {
+      await api.deleteFoodLog(log.id)
+      await load({ quiet: true })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  async function removeActivity(item) {
+    if (deletingId) return
+    const label = item.activity || 'this workout'
+    if (!window.confirm(`Delete ${label} from today’s exercise?`)) return
+    setDeletingId(`activity-${item.id}`)
+    setError('')
+    try {
+      await api.deleteActivityLog(item.id)
+      await load({ quiet: true })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const meals = useMemo(() => {
     const groups = Object.fromEntries(MEALS.map((meal) => [meal, []]))
@@ -146,7 +179,18 @@ export default function Today() {
                       {items.map((log) => (
                         <li key={log.id}>
                           <span>{log.food_name}, {formatNumber(log.grams, 0)} g</span>
-                          <strong>{formatNumber(macrosFromNutrients(log.nutrients).calories)} kcal</strong>
+                          <div className="log-line__actions">
+                            <strong>{formatNumber(macrosFromNutrients(log.nutrients).calories)} kcal</strong>
+                            <button
+                              type="button"
+                              className="icon-delete"
+                              aria-label={`Delete ${log.food_name}`}
+                              disabled={deletingId === `food-${log.id}`}
+                              onClick={() => removeFood(log)}
+                            >
+                              {deletingId === `food-${log.id}` ? '…' : '×'}
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -174,9 +218,20 @@ export default function Today() {
                         {item.duration_minutes != null && ` · ${formatNumber(item.duration_minutes, 0)} min`}
                         {item.intensity && ` · ${item.intensity}`}
                       </span>
-                      <strong>
-                        {item.calories_burned != null ? `${formatNumber(item.calories_burned)} kcal` : '—'}
-                      </strong>
+                      <div className="log-line__actions">
+                        <strong>
+                          {item.calories_burned != null ? `${formatNumber(item.calories_burned)} kcal` : '—'}
+                        </strong>
+                        <button
+                          type="button"
+                          className="icon-delete"
+                          aria-label={`Delete ${item.activity}`}
+                          disabled={deletingId === `activity-${item.id}`}
+                          onClick={() => removeActivity(item)}
+                        >
+                          {deletingId === `activity-${item.id}` ? '…' : '×'}
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
