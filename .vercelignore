@@ -1,0 +1,11 @@
+.env
+.env.*
+.venv/
+venv/
+instance/
+tests/
+.pytest_cache/
+__pycache__/
+.idea/
+Dockerfile
+compose.yaml
