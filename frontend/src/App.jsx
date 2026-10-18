@@ -1,14 +1,12 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { getToken } from './api'
-import Dashboard from './pages/Dashboard'
-import Goal from './pages/Goal'
+import AppShell from './components/AppShell'
+import AddFood from './pages/AddFood'
+import Goals from './pages/Goals'
 import Login from './pages/Login'
 import Register from './pages/Register'
-
-function Protected({ children }) {
-  if (!getToken()) return <Navigate to="/login" replace />
-  return children
-}
+import Today from './pages/Today'
+import Weekly from './pages/Weekly'
 
 export default function App() {
   return (
@@ -16,8 +14,12 @@ export default function App() {
       <Route path="/" element={<Navigate to={getToken() ? '/app' : '/register'} replace />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/goal" element={<Protected><Goal /></Protected>} />
-      <Route path="/app" element={<Protected><Dashboard /></Protected>} />
+      <Route path="/app" element={<AppShell />}>
+        <Route index element={<Today />} />
+        <Route path="add" element={<AddFood />} />
+        <Route path="weekly" element={<Weekly />} />
+        <Route path="goals" element={<Goals />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

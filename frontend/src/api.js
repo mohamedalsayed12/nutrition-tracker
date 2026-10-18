@@ -42,5 +42,41 @@ export const api = {
   login: (payload) => request('/api/v1/auth/login', { method: 'POST', body: payload, auth: false }),
   me: () => request('/api/v1/users/me'),
   setGoal: (goal) => request('/api/v1/goals/goal', { method: 'PUT', body: { goal } }),
+  setNutrition: (payload) => request('/api/v1/goals/nutrition', { method: 'PUT', body: payload }),
+  getNutrition: () => request('/api/v1/goals/nutrition'),
   dailyReport: (date) => request(`/api/v1/reports/daily${date ? `?date=${date}` : ''}`),
+  weeklyReport: () => request('/api/v1/reports/weekly'),
+  foodLogs: () => request('/api/v1/food-logs?per_page=100'),
+  createFoodLog: (payload) => request('/api/v1/food-logs', { method: 'POST', body: payload }),
+  deleteFoodLog: (id) => request(`/api/v1/food-logs/${id}`, { method: 'DELETE' }),
+  searchFoods: (q) => request(`/api/v1/foods?q=${encodeURIComponent(q)}`),
+  foodDetail: (fdcId) => request(`/api/v1/foods/${fdcId}`),
+  frequentFoods: () => request('/api/v1/foods/frequent'),
+}
+
+export function nutrientAmount(nutrients, names) {
+  const wanted = names.map((name) => name.toLowerCase())
+  for (const item of nutrients || []) {
+    const name = String(item.name || '').toLowerCase()
+    const unit = String(item.unit || '').toLowerCase()
+    if (!wanted.some((part) => name.includes(part))) continue
+    const amount = Number(item.eaten ?? item.per_100g ?? item.amount)
+    if (!Number.isFinite(amount)) continue
+    if (wanted.includes('energy') || wanted.includes('calorie')) {
+      if (unit === 'kcal') return amount
+      continue
+    }
+    if (unit === 'g' || unit === 'mg' || unit === 'mcg' || unit === 'µg') return amount
+    return amount
+  }
+  return 0
+}
+
+export function macrosFromNutrients(nutrients) {
+  return {
+    calories: nutrientAmount(nutrients, ['energy']),
+    protein: nutrientAmount(nutrients, ['protein']),
+    carbs: nutrientAmount(nutrients, ['carbohydrate']),
+    fat: nutrientAmount(nutrients, ['lipid', 'total fat', 'fat']),
+  }
 }

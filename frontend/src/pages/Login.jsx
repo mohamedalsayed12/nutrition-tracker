@@ -17,7 +17,7 @@ export default function Login() {
       const login = await api.login({ email, password })
       setToken(login.access_token)
       const me = await api.me()
-      navigate(me.needs_goal ? '/goal' : '/app')
+      navigate(me.needs_goal ? '/app/goals' : '/app')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -26,25 +26,18 @@ export default function Login() {
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <p className="eyebrow">Harvest</p>
+    <div className="phone-frame">
+      <main className="phone-screen auth-screen">
+        <p className="brand">Nutrition tracker</p>
         <h1>Welcome back</h1>
-        <p className="lede">Pick up today’s macros where you left off.</p>
-        <form className="stack-form" onSubmit={onSubmit}>
-          <label>
-            Email
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </label>
-          <label>
-            Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </label>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <button className="btn-primary" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <form className="stack" onSubmit={onSubmit}>
+          <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+          <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+          {error && <p className="banner-error">{error}</p>}
+          <button className="btn-green" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
         </form>
-        <p className="auth-switch">New here? <Link to="/register">Create an account</Link></p>
-      </section>
-    </main>
+        <p className="auth-foot">New here? <Link to="/register">Create an account</Link></p>
+      </main>
+    </div>
   )
 }

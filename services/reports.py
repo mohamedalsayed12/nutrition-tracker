@@ -89,9 +89,34 @@ def weekly_report(user_id, week_start, zone):
     foods = db.session.query(FoodLog).filter(FoodLog.user_id == user_id, FoodLog.logged_at >= start, FoodLog.logged_at < end).all()
     nutrition = db.session.get(NutritionTargets, user_id)
     preferences = db.session.get(HealthPreferences, user_id)
+    target = db.session.get(CalorieTarget, user_id)
     targets = configured_micronutrients(nutrition.age, nutrition.sex, preferences) if nutrition else []
-    return dict(week_start=week_start.isoformat(), timezone=str(zone),
-                **build_weekly_recap(foods, zone, week_start, targets))
+    calorie_goal = target.calories if target else None
+    daily_calories = []
+    for offset in range(7):
+        day = week_start + timedelta(days=offset)
+        day_start, day_end = day_range(day, zone)
+        day_foods = [log for log in foods if day_start <= as_utc(log.logged_at) < day_end]
+        eaten = round(sum(food_macros(log.nutrients).get("Calories", 0) for log in day_foods), 1)
+        on_target = (
+            calorie_goal is not None and eaten > 0
+            and abs(eaten - calorie_goal) <= calorie_goal * 0.10
+        )
+        daily_calories.append(dict(
+            date=day.isoformat(),
+            label=day.strftime("%a")[0],
+            calories=eaten,
+            on_target=on_target,
+        ))
+    days_on_target = sum(1 for row in daily_calories if row["on_target"])
+    return dict(
+        week_start=week_start.isoformat(),
+        timezone=str(zone),
+        calorie_goal=calorie_goal,
+        days_on_target=days_on_target,
+        daily_calories=daily_calories,
+        **build_weekly_recap(foods, zone, week_start, targets),
+    )
 
 
 def frequent_foods(user_id):
