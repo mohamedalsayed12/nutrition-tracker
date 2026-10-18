@@ -43,6 +43,8 @@ def client(app):
 def authorized_headers(client):
     response = client.post("/api/v1/users", json={
         "name": "Test User", "email": "user@example.com", "password": "a-secure-password",
+        "age": 30, "sex": "male", "height_cm": 175, "weight_kg": 75,
+        "activity_level": "moderately active",
     })
     assert response.status_code == 201
     response = client.post("/api/v1/auth/login", json={

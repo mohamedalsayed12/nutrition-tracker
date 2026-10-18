@@ -54,8 +54,8 @@ The API container applies migrations before starting Gunicorn on port 8000. `/ap
 
 | Method and path | Purpose |
 | --- | --- |
-| `POST /api/v1/users` | Register with `name`, `email`, and `password`. |
-| `GET /api/v1/users/me` | Read the authenticated user. |
+| `POST /api/v1/users` | Register with `name`, `email`, `password`, plus `age`, `sex`, `height_cm`, `weight_kg`, and `activity_level`. |
+| `GET /api/v1/users/me` | Read the authenticated user, saved profile, and whether a goal is still needed. |
 | `POST /api/v1/auth/login` | Exchange email and password for an access token. |
 | `GET`, `POST /api/v1/food-logs` | List or create your food logs. |
 | `GET`, `PUT`, `DELETE /api/v1/food-logs/{id}` | Read, replace, or delete your food log. |
@@ -63,6 +63,7 @@ The API container applies migrations before starting Gunicorn on port 8000. `/ap
 | `GET`, `PUT`, `DELETE /api/v1/activity-logs/{id}` | Read, replace, or delete your activity log. |
 | `GET`, `PUT /api/v1/goals/calories` | Read or set your calorie target. |
 | `GET`, `PUT /api/v1/goals/nutrition` | Read or calculate nutrition targets. |
+| `PUT /api/v1/goals/goal` | After registration, choose `maintain`, `lose_weight`, or `gain_weight` to set calories and macros from the saved profile. |
 | `GET`, `PUT /api/v1/settings/health` | Read or replace health preferences and personal targets. |
 | `GET`, `PUT`, `DELETE /api/v1/settings/macro-split` | Read, replace, or reset macro percentages. |
 | `GET /api/v1/foods?q=...` | Search USDA foods, optionally personalized with a token. |
@@ -96,13 +97,49 @@ Food log creation and replacement use:
 
 Nutrient amounts come from USDA on the server. Allowed meals are `breakfast`, `lunch`, `dinner`, and `snack`.
 
-Nutrition setup uses:
+Registration uses:
+
+```json
+{
+  "name": "Ada",
+  "email": "ada@example.com",
+  "password": "a-secure-password",
+  "age": 30,
+  "sex": "female",
+  "height_cm": 165,
+  "weight_kg": 60,
+  "activity_level": "moderately active"
+}
+```
+
+After login, `GET /api/v1/users/me` returns `needs_goal: true` until the user chooses a goal:
+
+```json
+{"goal": "lose_weight"}
+```
+
+`PUT /api/v1/goals/goal` calculates BMR/TDEE from the registration profile and writes calorie and macro targets. Full nutrition setup (replacing all fields at once) still uses:
 
 ```json
 {"age": 30, "sex": "male", "height_cm": 175, "weight_kg": 75, "activity_level": "moderately active", "goal": "maintain"}
 ```
 
-The existing calculation rules and source-linked condition guidance are retained as backend services. Activity logging requires nutrition setup. Use `/openapi.json` for complete field constraints and allowed values.
+## Frontend (Harvest)
+
+A React app in `frontend/` provides registration with body metrics, a goal picker, and a sticky top **macro progress bar** that fills as logged intake approaches calorie, protein, carb, and fat targets.
+
+```bash
+# terminal 1 — API
+.venv/bin/python -m flask --app main db upgrade
+.venv/bin/python -m flask --app main run --debug --port 8000
+
+# terminal 2 — UI (proxies /api to port 8000)
+cd frontend && npm install && npm run dev
+```
+
+Open `http://localhost:3000`. Set `FRONTEND_ORIGIN=http://localhost:3000` in `.env` for CORS when the UI and API origins differ.
+
+The existing calculation rules and source-linked condition guidance are retained as backend services. Activity logging requires nutrition setup (completed by choosing a goal). Use `/openapi.json` for complete field constraints and allowed values.
 
 ## Database migrations and existing records
 

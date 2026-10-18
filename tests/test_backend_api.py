@@ -1,11 +1,19 @@
 from types import SimpleNamespace
 from datetime import datetime, timezone
 
-def register_and_login(client, email):
-    registration = client.post("/api/v1/users", json={
+PROFILE = {
+    "age": 30, "sex": "male", "height_cm": 175, "weight_kg": 75,
+    "activity_level": "moderately active",
+}
+
+
+def register_and_login(client, email, **profile_overrides):
+    payload = {
         "name": "Test User", "email": email, "password": "a-secure-password",
-    })
-    assert registration.status_code == 201
+        **PROFILE, **profile_overrides,
+    }
+    registration = client.post("/api/v1/users", json=payload)
+    assert registration.status_code == 201, registration.json
     login = client.post("/api/v1/auth/login", json={
         "email": email, "password": "a-secure-password",
     })
@@ -16,13 +24,36 @@ def register_and_login(client, email):
 def test_auth_and_private_profile(client):
     assert client.get("/api/v1/users/me").status_code == 401
     first = register_and_login(client, "first@example.com")
-    assert client.get("/api/v1/users/me", headers=first).json["email"] == "first@example.com"
+    me = client.get("/api/v1/users/me", headers=first).json
+    assert me["email"] == "first@example.com"
+    assert me["needs_goal"] is True
+    assert me["profile"]["weight_kg"] == 75
     assert client.post("/api/v1/users", json={
         "name": "Other", "email": "first@example.com", "password": "a-secure-password",
+        **PROFILE,
     }).status_code == 409
     assert client.post("/api/v1/auth/login", json={
         "email": "first@example.com", "password": "wrong-password",
     }).status_code == 401
+
+
+def test_registration_then_goal_sets_calories_and_macros(client):
+    headers = register_and_login(client, "goal@example.com", sex="female", weight_kg=60, height_cm=165)
+    me = client.get("/api/v1/users/me", headers=headers).json
+    assert me["needs_goal"] is True
+    response = client.put("/api/v1/goals/goal", headers=headers, json={"goal": "lose_weight"})
+    assert response.status_code == 200
+    assert response.json["calories"] > 0
+    assert response.json["protein_min"] > 0
+    assert response.json["carbs"] > 0
+    assert response.json["goal"] == "lose_weight"
+    me = client.get("/api/v1/users/me", headers=headers).json
+    assert me["needs_goal"] is False
+    assert me["nutrition_configured"] is True
+    daily = client.get("/api/v1/reports/daily", headers=headers).json
+    assert daily["calorie_goal"] == response.json["calories"]
+    names = {row["name"] for row in daily["progress"]}
+    assert {"Calories", "Protein", "Carbohydrates"}.issubset(names)
 
 
 def test_food_logs_are_scoped_to_owner_and_summarized(client, monkeypatch):

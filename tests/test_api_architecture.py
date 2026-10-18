@@ -22,8 +22,8 @@ def test_frontend_routes_are_removed(client, path):
 
 
 @pytest.mark.parametrize("payload", [
-    {"name": "A", "email": "bad@", "password": "a-secure-password"},
-    {"name": "A", "email": "user@example.com", "password": "short"},
+    {"name": "A", "email": "bad@", "password": "a-secure-password", "age": 30, "sex": "male", "height_cm": 175, "weight_kg": 75, "activity_level": "moderately active"},
+    {"name": "A", "email": "user@example.com", "password": "short", "age": 30, "sex": "male", "height_cm": 175, "weight_kg": 75, "activity_level": "moderately active"},
     {"name": "A", "email": "user@example.com", "password": "a-secure-password", "uid": 99},
     [],
 ])
@@ -35,6 +35,10 @@ def test_user_schema_rejects_invalid_input(client, payload):
 
 def test_deleted_user_token_cannot_access_resources(client, app, authorized_headers):
     with app.app_context():
+        from models import OnboardingProfile, UserActivityBaseline, UserMeasurements
+        db.session.query(OnboardingProfile).delete()
+        db.session.query(UserMeasurements).delete()
+        db.session.query(UserActivityBaseline).delete()
         db.session.query(User).delete()
         db.session.commit()
     assert client.get("/api/v1/food-logs", headers=authorized_headers).status_code == 401

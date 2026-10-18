@@ -13,10 +13,20 @@ class InputModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
+ActivityLevel = Literal["sedentary", "lightly active", "moderately active", "very active", "extra active"]
+Sex = Literal["male", "female"]
+Goal = Literal["maintain", "lose_weight", "gain_weight"]
+
+
 class UserCreate(InputModel):
     name: Name
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    age: int = Field(ge=18, le=100, strict=True)
+    sex: Sex
+    height_cm: float = Field(ge=50, le=300)
+    weight_kg: float = Field(ge=20, le=500)
+    activity_level: ActivityLevel
 
     @field_validator("email")
     @classmethod
@@ -34,6 +44,10 @@ class UserCreate(InputModel):
 class UserLogin(InputModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
+
+
+class GoalChoice(InputModel):
+    goal: Goal
 
 
 class FoodLogCreate(InputModel):
@@ -57,11 +71,11 @@ class CalorieGoal(InputModel):
 
 class NutritionSetup(InputModel):
     age: int = Field(ge=18, le=100, strict=True)
-    sex: Literal["male", "female"]
+    sex: Sex
     height_cm: float = Field(ge=50, le=300)
     weight_kg: float = Field(ge=20, le=500)
-    activity_level: Literal["sedentary", "lightly active", "moderately active", "very active", "extra active"]
-    goal: Literal["maintain", "lose_weight", "gain_weight"]
+    activity_level: ActivityLevel
+    goal: Goal
 
 
 class MacroSplitInput(InputModel):

@@ -339,12 +339,12 @@ def daily_target_progress(today_food_logs, daily_calorie_target, exercise_credit
                                         for name, key in (("Protein", "protein"), ("Carbohydrates", "carbs"), ("Fat", "fat")))
             else:
                 protein_label = (f"{protein_max} g" if getattr(preferences, "custom_protein", None) is not None
-                                 else f"{protein_min}Ã¢â‚¬â€œ{protein_max} g")
+                                 else f"{protein_min}-{protein_max} g")
                 progress_targets.extend((("Protein", protein_max, protein_label),
                                          ("Carbohydrates", carbs_target, f"{carbs_target} g")))
                 if fat_range:
                     fat_label = (f"{fat_range[1]} g" if getattr(preferences, "custom_fat", None) is not None
-                                 else f"{fat_range[0]}Ã¢â‚¬â€œ{fat_range[1]} g")
+                                 else f"{fat_range[0]}-{fat_range[1]} g")
                     progress_targets.append(("Fat", fat_range[1], fat_label))
         for name, goal, target_label in progress_targets:
             reported = counts[name]

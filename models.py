@@ -12,6 +12,26 @@ class User(db.Model):
     def __repr__(self):
         return f'<User: {self.username}>'
 
+
+class OnboardingProfile(db.Model):
+    """Body metrics collected at registration before a calorie goal is chosen."""
+
+    __tablename__ = "onboarding_profiles"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
+    age = db.Column(db.Integer, nullable=False)
+    sex = db.Column(db.String(10), nullable=False)
+    height_cm = db.Column(db.Float, nullable=False)
+    weight_kg = db.Column(db.Float, nullable=False)
+    activity_level = db.Column(db.String(30), nullable=False)
+    goal = db.Column(db.String(20), nullable=True)
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
 class CalorieTarget(db.Model):
     __tablename__ = "calorie_targets"
 
