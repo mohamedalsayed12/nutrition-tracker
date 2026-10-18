@@ -218,9 +218,17 @@ export default function AddFood() {
   }, [detail, grams])
 
   const per100 = detail ? macrosFromNutrients(detail.nutrients) : null
-  const proteinPer100kcal = per100 && per100.calories > 0
-    ? (per100.protein / per100.calories) * 100
-    : null
+  const density = detail?.density || null
+  const macrosPer100kcal = density?.macros_per_100kcal || (
+    per100 && per100.calories > 0
+      ? {
+          protein: (per100.protein / per100.calories) * 100,
+          carbs: (per100.carbs / per100.calories) * 100,
+          fat: (per100.fat / per100.calories) * 100,
+        }
+      : null
+  )
+  const topMicros = (density?.micronutrients || []).slice(0, 4)
 
   async function addFood(event) {
     event.preventDefault()
@@ -310,11 +318,50 @@ export default function AddFood() {
 
       {detail && selected && (
         <form className="card food-detail" onSubmit={addFood}>
-          <h2>{detail.description || selected.description}</h2>
-          <p className="muted">
-            {formatNumber(per100?.calories, 0)} kcal / 100 g
-            {proteinPer100kcal != null && ` · ${formatNumber(proteinPer100kcal, 1)} g protein / 100 kcal`}
-          </p>
+          <div className="food-detail__head">
+            <div>
+              <h2>{detail.description || selected.description}</h2>
+              <p className="muted">
+                {formatNumber(per100?.calories, 0)} kcal / 100 g
+              </p>
+            </div>
+            {density?.score != null && (
+              <div className="density-badge" title={(density.reasons || []).join(' ')}>
+                <strong>{density.score}</strong>
+                <span>density</span>
+              </div>
+            )}
+          </div>
+
+          {macrosPer100kcal && (
+            <div className="density-macros">
+              <p className="density-label">Per 100 kcal</p>
+              <div className="macro-grid">
+                <div><strong>{formatNumber(macrosPer100kcal.protein, 1)}</strong><span>g protein</span></div>
+                <div><strong>{formatNumber(macrosPer100kcal.carbs, 1)}</strong><span>g carbs</span></div>
+                <div><strong>{formatNumber(macrosPer100kcal.fat, 1)}</strong><span>g fat</span></div>
+              </div>
+            </div>
+          )}
+
+          {topMicros.length > 0 && (
+            <ul className="density-micros">
+              {topMicros.map((item) => (
+                <li key={item.name}>
+                  <span>{item.name}</span>
+                  <strong>
+                    {formatNumber(item.per_100kcal, item.per_100kcal >= 10 ? 1 : 2)} {item.unit}
+                    <small>/{' '}{formatNumber(item.percent_of_target_per_100kcal, 0)}% target</small>
+                  </strong>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {density?.reasons?.[0] && (
+            <p className="density-reason">{density.reasons[0]}</p>
+          )}
+
           <div className="qty-row">
             <button type="button" onClick={() => setGrams((value) => Math.max(5, Number(value) - 10))}>-</button>
             <label>

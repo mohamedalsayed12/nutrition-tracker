@@ -99,18 +99,59 @@ def _energy_per_100g(nutrients):
     return min(candidates)[1] if candidates else None
 
 
-def npc_rating(nutrients, targets, daily_calories, npc):
-    if not targets or not daily_calories or daily_calories <= 0:
-        return {"score": None, "reasons": ["Calculate your nutrition targets to rate this food."]}
+def _macro_amounts_per_100g(nutrients):
+    amounts = {"protein": 0.0, "carbs": 0.0, "fat": 0.0}
+    for nutrient in nutrients or ():
+        name = _name(nutrient.get("name", ""))
+        unit = _unit(nutrient.get("unit"))
+        if unit != "g":
+            continue
+        try:
+            amount = float(nutrient.get("per_100g"))
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(amount) or amount < 0:
+            continue
+        if name == "protein" or name.startswith("protein "):
+            amounts["protein"] = max(amounts["protein"], amount)
+        elif name.startswith("carbohydrate"):
+            amounts["carbs"] = max(amounts["carbs"], amount)
+        elif name in ("total lipid fat", "total fat", "fat") or name.startswith("total lipid"):
+            amounts["fat"] = max(amounts["fat"], amount)
+    return amounts
+
+
+def macro_density(nutrients):
+    """Macro grams per 100 kcal from per-100g nutrient rows."""
     energy = _energy_per_100g(nutrients)
     if energy is None:
-        return {"score": None, "reasons": ["This food has no usable energy value in kcal."]}
+        return {"energy_kcal_per_100g": None, "per_100kcal": None}
+    amounts = _macro_amounts_per_100g(nutrients)
+    return {
+        "energy_kcal_per_100g": round(energy, 1),
+        "per_100kcal": {
+            name: round(nutrient_per_100_calories(amount, energy), 2)
+            for name, amount in amounts.items()
+        },
+    }
+
+
+def npc_rating(nutrients, targets, daily_calories, npc=nutrient_per_100_calories):
+    if not targets or not daily_calories or daily_calories <= 0:
+        return {"score": None, "reasons": ["Calculate your nutrition targets to rate this food."],
+                "nutrients": [], "energy_kcal_per_100g": _energy_per_100g(nutrients)}
+    energy = _energy_per_100g(nutrients)
+    if energy is None:
+        return {"score": None, "reasons": ["This food has no usable energy value in kcal."],
+                "nutrients": [], "energy_kcal_per_100g": None}
     scored_targets = [item for item in targets if item.get("direction") != "maximum"]
     amounts = matched_micronutrients(nutrients, scored_targets, "per_100g")
     if not amounts:
-        return {"score": None, "reasons": ["No matching micronutrient amounts are reported for this food."]}
+        return {"score": None, "reasons": ["No matching micronutrient amounts are reported for this food."],
+                "nutrients": [], "energy_kcal_per_100g": round(energy, 1)}
 
     contributions = []
+    nutrient_rows = []
     for target in scored_targets:
         amount = amounts.get(target["name"], 0)
         target_amount = target["target"]
@@ -119,10 +160,21 @@ def npc_rating(nutrients, targets, daily_calories, npc):
         per_100kcal = npc(amount, energy)
         fraction_of_target = per_100kcal / target_amount
         density_ratio = fraction_of_target * daily_calories / 100
-        contributions.append((target["name"], fraction_of_target * 100, min(density_ratio / 2, 1)))
+        contribution = min(density_ratio / 2, 1)
+        contributions.append((target["name"], fraction_of_target * 100, contribution))
+        if target["name"] in amounts:
+            nutrient_rows.append({
+                "name": target["name"],
+                "unit": target["unit"],
+                "per_100g": round(amount, 3),
+                "per_100kcal": round(per_100kcal, 3),
+                "target": target_amount,
+                "percent_of_target_per_100kcal": round(fraction_of_target * 100, 1),
+            })
 
     if not contributions:
-        return {"score": None, "reasons": ["No usable micronutrient targets are available."]}
+        return {"score": None, "reasons": ["No usable micronutrient targets are available."],
+                "nutrients": [], "energy_kcal_per_100g": round(energy, 1)}
     score = round(100 * sum(item[2] for item in contributions) / len(contributions))
     strongest = sorted((item for item in contributions if item[0] in amounts and item[1] > 0), key=lambda item: item[2], reverse=True)[:2]
     reasons = [f"{name} provides {percent:.1f}% of your daily target per 100 kcal." for name, percent, _ in strongest]
@@ -130,7 +182,26 @@ def npc_rating(nutrients, targets, daily_calories, npc):
         reasons.append("The reported micronutrients provide little of your daily targets per 100 kcal.")
     if len(amounts) < len(scored_targets):
         reasons.append(f"Only {len(amounts)} of {len(scored_targets)} target micronutrients are reported; missing data earn no points.")
-    return {"score": max(0, min(score, 100)), "reasons": reasons}
+    nutrient_rows.sort(key=lambda row: row["percent_of_target_per_100kcal"], reverse=True)
+    return {
+        "score": max(0, min(score, 100)),
+        "reasons": reasons,
+        "energy_kcal_per_100g": round(energy, 1),
+        "nutrients": nutrient_rows,
+    }
+
+
+def food_nutrient_density(nutrients, targets=None, daily_calories=None):
+    """Combined macro + micronutrient density for a food portion basis of 100 kcal."""
+    macros = macro_density(nutrients)
+    rating = npc_rating(nutrients, targets or [], daily_calories or 0)
+    return {
+        "score": rating["score"],
+        "reasons": rating["reasons"],
+        "energy_kcal_per_100g": macros["energy_kcal_per_100g"] or rating.get("energy_kcal_per_100g"),
+        "macros_per_100kcal": macros["per_100kcal"],
+        "micronutrients": rating["nutrients"],
+    }
 
 
 def remaining_targets(food_logs, targets, include_food_advice=True):
