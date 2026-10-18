@@ -1,7 +1,10 @@
+import re
+from decimal import Decimal, InvalidOperation
 
-from imports import Decimal, InvalidOperation, re, get_bmr, get_tdee
-from nutrient_targets import micronutrient_targets
-from weekly_recap import food_macros
+from healthsciencecalculator.get_bmr import get_bmr
+from healthsciencecalculator.get_tdee import get_tdee
+from services.nutrient_targets import micronutrient_targets
+from services.weekly_recap import food_macros
 
 
 class UserInfo:
@@ -30,7 +33,7 @@ def calculate_goal_targets(info, goal, pregnancy_active):
     bmr = info.calculate_bmr()
     tdee = info.calculate_tdee(info.activity_level)
     if pregnancy_active and goal != "maintain":
-        raise ValueError("Use a maintenance goal for this baseline estimate during pregnancy; set your pregnancy calorie target in Medical condition setting.")
+        raise ValueError("Use a maintenance goal for this baseline estimate during pregnancy; set your pregnancy calorie target in health settings.")
     if goal == "maintain":
         calories = tdee
     elif goal == "lose_weight":
@@ -153,9 +156,9 @@ def estimate_exercise_calories(duration_minutes, activity_type, weight_kg, heigh
     elif sex == "female":
         resting_kcal_day = 655.0955 + 1.8496 * height_cm + 9.5634 * weight_kg - 4.6756 * age
     else:
-        raise ValueError("Update your UserInfo sex before estimating exercise calories.")
+        raise ValueError("Update your nutrition sex before estimating exercise calories.")
     if resting_kcal_day <= 0:
-        raise ValueError("Update your UserInfo measurements before estimating exercise calories.")
+        raise ValueError("Update your nutrition measurements before estimating exercise calories.")
     return round(met * resting_kcal_day * duration_minutes / 1440, 1)
 
 
@@ -295,18 +298,6 @@ def grams_for_measure(food, quantity, measure_code):
     return grams
 
 
-def exercise_adjusted_target(target, activity_logs, today, activity_baseline, fixed_care_plan_target):
-    credit = 0
-    if target is not None and activity_baseline is not None and not fixed_care_plan_target:
-        credit = round(sum(
-            log.target_credit.active_calories for log in activity_logs
-            if log.local_date == today and log.target_credit is not None
-            and log.target_credit.extra and log.logged_at >= activity_baseline.changed_at
-        ), 1)
-    calories = round(target.calories + credit, 1) if target is not None else None
-    return credit, calories
-
-
 def daily_target_progress(today_food_logs, daily_calorie_target, exercise_credit_today,
                           nutrition, macro_split, preferences):
     totals = {name: 0.0 for name in ("Calories", "Protein", "Carbohydrates", "Fat")}
@@ -335,12 +326,12 @@ def daily_target_progress(today_food_logs, daily_calorie_target, exercise_credit
                                         for name, key in (("Protein", "protein"), ("Carbohydrates", "carbs"), ("Fat", "fat")))
             else:
                 protein_label = (f"{protein_max} g" if getattr(preferences, "custom_protein", None) is not None
-                                 else f"{protein_min}–{protein_max} g")
+                                 else f"{protein_min}Ã¢â‚¬â€œ{protein_max} g")
                 progress_targets.extend((("Protein", protein_max, protein_label),
                                          ("Carbohydrates", carbs_target, f"{carbs_target} g")))
                 if fat_range:
                     fat_label = (f"{fat_range[1]} g" if getattr(preferences, "custom_fat", None) is not None
-                                 else f"{fat_range[0]}–{fat_range[1]} g")
+                                 else f"{fat_range[0]}Ã¢â‚¬â€œ{fat_range[1]} g")
                     progress_targets.append(("Fat", fat_range[1], fat_label))
         for name, goal, target_label in progress_targets:
             reported = counts[name]
@@ -360,27 +351,8 @@ def daily_target_progress(today_food_logs, daily_calorie_target, exercise_credit
                     note = " (care-plan amount)"
             progress.append({"name": name, "logged": logged, "target_label": target_label,
                              "unit": "kcal" if name == "Calories" else "g", "percent": percent,
-                             "bar_width": min(percent, 100) if percent is not None else 0,
                              "partial": 0 < reported < len(today_food_logs), "note": note})
     return progress, fat_range, custom_macros, protein_min, protein_max, carbs_target
-
-
-def weekly_target_labels(calories, nutrition, split, preferences):
-    custom = custom_macro_targets(calories, split, preferences)
-    fat_range = fat_target_range(calories, nutrition.age) if calories is not None and nutrition is not None else None
-    protein_override = getattr(preferences, "custom_protein", None)
-    fat_override = getattr(preferences, "custom_fat", None)
-    return {
-        "Calories": f"{calories} kcal" if calories is not None else "Not set",
-        "Protein": (f"{custom['protein']} g" if custom else
-                    f"{protein_override} g" if protein_override is not None else
-                    f"{nutrition.protein_min}–{nutrition.protein_max} g" if nutrition else "Not set"),
-        "Carbohydrates": (f"{custom['carbs']} g" if custom else
-                          f"{nutrition.carbs} g" if nutrition else "Not set"),
-        "Fat": (f"{custom['fat']} g" if custom else
-                f"{fat_override} g" if fat_override is not None else
-                f"{fat_range[0]}–{fat_range[1]} g" if fat_range else "Not set"),
-    }
 
 
 def condition_nutrition_data(today_food_logs, daily_calories):
@@ -415,7 +387,7 @@ def condition_nutrition_data(today_food_logs, daily_calories):
 
 
 def frequent_food_choices(food_logs, per_meal=5):
-    choices = {meal: {} for meal in ("breakfast", "lunch", "dinner")}
+    choices = {meal: {} for meal in ("breakfast", "lunch", "dinner", "snack")}
     recent_duplicates = {}
     for log in food_logs:
         if log.meal not in choices:

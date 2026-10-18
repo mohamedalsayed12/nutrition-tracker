@@ -1,0 +1,11 @@
+.env
+.venv
+venv
+.git
+.idea
+__pycache__
+.pytest_cache
+instance
+food_cache.sqlite3
+*.pyc
+tests

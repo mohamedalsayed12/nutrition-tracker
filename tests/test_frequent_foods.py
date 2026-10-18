@@ -1,8 +1,7 @@
-
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 import unittest
-from calc import frequent_food_choices
+from services.calc import frequent_food_choices
 
 
 def food_log(meal, fdc_id, name, grams, when):
