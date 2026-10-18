@@ -1,6 +1,18 @@
 # Nutrition Tracker API
 
-A Flask REST backend for user accounts, food and activity logs, nutrition targets, health preferences, and reports. PostgreSQL stores application records through SQLAlchemy. The project contains no HTML templates, browser pages, or form/session authentication.
+This is the backend for a nutrition tracker I'm building. It lets people log food and activity, set goals, and understand how a day or week compares with those goals. I kept the API separate from the frontend so a web or mobile interface can use the same data and calculations.
+
+The app uses Flask for HTTP endpoints, PostgreSQL for records, and SQLAlchemy for database access. It has no HTML pages or browser session login yet; clients use JWT access tokens.
+
+## What works today
+
+- Accounts, login, and user-specific food and activity logs.
+- Food lookup through USDA FoodData Central, with nutrients calculated on the server.
+- Calorie and nutrient targets, macro split settings, and health preferences.
+- Daily reports, weekly recaps, saved days, and frequently logged foods.
+- PostgreSQL migrations, Docker setup, OpenAPI documentation, and automated tests.
+
+Food search needs a USDA API key. Exercise search needs an API Ninjas key. The frontend and hosted deployment are still in progress.
 
 ## Architecture
 
