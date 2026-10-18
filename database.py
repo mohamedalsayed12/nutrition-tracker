@@ -15,6 +15,8 @@ def init_database(app):
     })
     db.init_app(app)
     migrate.init_app(app, db)
+    # Register every model with SQLAlchemy metadata before create_all / migrations.
+    import models  # noqa: F401
 
 
 def save_calorie_target(user_id, calories):

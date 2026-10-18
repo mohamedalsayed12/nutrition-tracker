@@ -26,11 +26,12 @@ def app():
         "FRONTEND_ORIGINS": ["http://localhost:3000"],
     })
     with app.app_context():
+        db.drop_all()
         db.create_all()
     yield app
     with app.app_context():
         db.session.remove()
-        db.drop_all()
+        db.drop_all(checkfirst=True)
         db.engine.dispose()
 
 
