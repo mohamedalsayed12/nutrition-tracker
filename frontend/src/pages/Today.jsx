@@ -5,12 +5,34 @@ import CalorieRing from '../components/CalorieRing'
 import MacroBars from '../components/MacroBars'
 import { formatDateHeading, formatNumber, progressRow } from '../lib/format'
 
-const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
+const MEALS = ['breakfast', 'lunch', 'dinner']
+
+function todayIso() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function isSameDay(value, now = new Date()) {
+  const logged = new Date(value)
+  return (
+    logged.getFullYear() === now.getFullYear()
+    && logged.getMonth() === now.getMonth()
+    && logged.getDate() === now.getDate()
+  )
+}
 
 export default function Today() {
   const navigate = useNavigate()
   const [report, setReport] = useState(null)
   const [logs, setLogs] = useState([])
+  const [activities, setActivities] = useState([])
+  const [sex, setSex] = useState(null)
+  const [healthConditions, setHealthConditions] = useState([])
+  const [periodToday, setPeriodToday] = useState(false)
+  const [periodBusy, setPeriodBusy] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -23,18 +45,21 @@ export default function Today() {
         navigate('/app/goals')
         return
       }
-      const [daily, foodLogs] = await Promise.all([api.dailyReport(), api.foodLogs()])
-      const now = new Date()
-      const items = (foodLogs.items || []).filter((log) => {
-        const logged = new Date(log.logged_at)
-        return (
-          logged.getFullYear() === now.getFullYear()
-          && logged.getMonth() === now.getMonth()
-          && logged.getDate() === now.getDate()
-        )
-      })
+      const day = todayIso()
+      const [daily, foodLogs, activityLogs, health, dayConditions, nutrition] = await Promise.all([
+        api.dailyReport(),
+        api.foodLogs(),
+        api.activityLogs(),
+        api.getHealth().catch(() => ({ conditions: [] })),
+        api.getDayConditions(day).catch(() => ({ conditions: [] })),
+        api.getNutrition().catch(() => null),
+      ])
+      setSex(nutrition?.sex || me.profile?.sex || null)
+      setHealthConditions(health.conditions || [])
+      setPeriodToday((dayConditions.conditions || []).includes('menstruation'))
       setReport(daily)
-      setLogs(items)
+      setLogs((foodLogs.items || []).filter((log) => isSameDay(log.logged_at)))
+      setActivities((activityLogs.items || []).filter((log) => isSameDay(log.logged_at)))
     } catch (err) {
       setError(err.message)
       if (/unauthorized|token|401/i.test(err.message)) {
@@ -62,6 +87,30 @@ export default function Today() {
   const exercise = report?.exercise_credit ?? 0
   const left = Math.max(target - eaten, 0)
   const percent = target > 0 ? (eaten / target) * 100 : 0
+  const exerciseKcal = activities.reduce((sum, item) => sum + (Number(item.calories_burned) || 0), 0)
+  const canLogPeriod = sex === 'female' && !healthConditions.includes('pregnancy')
+
+  async function togglePeriod() {
+    if (!canLogPeriod || periodBusy) return
+    setPeriodBusy(true)
+    setError('')
+    const day = todayIso()
+    const next = !periodToday
+    try {
+      if (next) {
+        await api.setDayConditions(day, { conditions: ['menstruation'] })
+      } else {
+        await api.clearDayConditions(day)
+      }
+      setPeriodToday(next)
+      const daily = await api.dailyReport()
+      setReport(daily)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setPeriodBusy(false)
+    }
+  }
 
   return (
     <main className="screen">
@@ -87,6 +136,26 @@ export default function Today() {
           <section className="card">
             <MacroBars progress={report.progress} />
           </section>
+
+          {canLogPeriod && (
+            <section className="card period-card">
+              <div className="period-card__row">
+                <div>
+                  <h2>Period today</h2>
+                  <p className="muted">Raises iron (+5 mg) and vitamin C (+35 mg) for today</p>
+                </div>
+                <button
+                  type="button"
+                  className={`toggle-btn ${periodToday ? 'is-on' : ''}`}
+                  aria-pressed={periodToday}
+                  disabled={periodBusy}
+                  onClick={togglePeriod}
+                >
+                  {periodToday ? 'On' : 'Off'}
+                </button>
+              </div>
+            </section>
+          )}
 
           <section className="meal-list">
             {MEALS.map((meal) => {
@@ -116,6 +185,33 @@ export default function Today() {
                 </article>
               )
             })}
+
+            <article className="card meal-card">
+              <div className="meal-card__head">
+                <div>
+                  <h2>Exercise</h2>
+                  <p>{formatNumber(exerciseKcal)} kcal burned</p>
+                </div>
+                <Link to="/app/exercise" className="icon-add" aria-label="Add exercise">+</Link>
+              </div>
+              {activities.length === 0 ? (
+                <p className="muted empty-meal">No exercise logged yet</p>
+              ) : (
+                <ul className="food-lines">
+                  {activities.map((item) => (
+                    <li key={item.id}>
+                      <span>
+                        {item.activity}
+                        {item.duration_minutes != null && ` · ${formatNumber(item.duration_minutes, 0)} min`}
+                      </span>
+                      <strong>
+                        {item.calories_burned != null ? `${formatNumber(item.calories_burned)} kcal` : '—'}
+                      </strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
           </section>
         </>
       )}

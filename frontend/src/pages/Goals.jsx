@@ -11,6 +11,13 @@ const ACTIVITY = [
   'extra active',
 ]
 
+const HEALTH_CONDITIONS = [
+  { id: 'pregnancy', label: 'Pregnancy' },
+  { id: 'diabetes', label: 'Diabetes' },
+  { id: 'ibs', label: 'IBS' },
+  { id: 'menstruation', label: 'Periods / menstruation' },
+]
+
 const INITIAL = {
   age: 22,
   sex: 'male',
@@ -23,6 +30,9 @@ const INITIAL = {
 export default function Goals() {
   const navigate = useNavigate()
   const [form, setForm] = useState(INITIAL)
+  const [conditions, setConditions] = useState([])
+  const [trimester, setTrimester] = useState(2)
+  const [guidance, setGuidance] = useState([])
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -32,7 +42,11 @@ export default function Goals() {
     let active = true
     async function load() {
       try {
-        const [me, nutrition] = await Promise.all([api.me(), api.getNutrition()])
+        const [me, nutrition, health] = await Promise.all([
+          api.me(),
+          api.getNutrition(),
+          api.getHealth().catch(() => ({ conditions: [], trimester: null, guidance: [] })),
+        ])
         if (!active) return
         const profile = me.profile || {}
         setForm({
@@ -43,6 +57,9 @@ export default function Goals() {
           activity_level: nutrition.activity_level || profile.activity_level || INITIAL.activity_level,
           goal: nutrition.goal || profile.goal || (me.needs_goal ? 'maintain' : 'maintain'),
         })
+        setConditions(health.conditions || [])
+        setTrimester(health.trimester || 2)
+        setGuidance(health.guidance || [])
       } catch (err) {
         if (!active) return
         setError(err.message)
@@ -63,6 +80,20 @@ export default function Goals() {
     setPreview(null)
   }
 
+  function toggleCondition(id) {
+    setConditions((current) => {
+      const has = current.includes(id)
+      let next = has ? current.filter((item) => item !== id) : [...current, id]
+      if (id === 'pregnancy' && !has) {
+        next = next.filter((item) => item !== 'menstruation')
+      }
+      if (id === 'menstruation' && !has) {
+        next = next.filter((item) => item !== 'pregnancy')
+      }
+      return next
+    })
+  }
+
   const macros = useMemo(() => {
     if (!preview) return null
     const calories = preview.calories
@@ -74,6 +105,13 @@ export default function Goals() {
     const fat = calories * fatPct / 100 / 9
     return { calories, protein, proteinPct, carbs, carbsPct, fat, fatPct }
   }, [preview])
+
+  const visibleConditions = HEALTH_CONDITIONS.filter((item) => {
+    if (item.id === 'pregnancy' || item.id === 'menstruation') {
+      return form.sex === 'female'
+    }
+    return true
+  })
 
   async function save(event) {
     event.preventDefault()
@@ -94,6 +132,17 @@ export default function Goals() {
         protein_percent: 25,
         fat_percent: 30,
       })
+
+      const healthPayload = {
+        conditions: form.sex === 'female'
+          ? conditions
+          : conditions.filter((item) => item !== 'pregnancy' && item !== 'menstruation'),
+        trimester: conditions.includes('pregnancy') ? Number(trimester) : null,
+      }
+      const health = await api.setHealth(healthPayload)
+      setConditions(health.conditions || [])
+      setTrimester(health.trimester || 2)
+      setGuidance(health.guidance || [])
       setPreview(result)
     } catch (err) {
       setError(err.message)
@@ -118,7 +167,14 @@ export default function Goals() {
                   key={sex}
                   type="button"
                   className={form.sex === sex ? 'is-active' : ''}
-                  onClick={() => update('sex', sex)}
+                  onClick={() => {
+                    update('sex', sex)
+                    if (sex === 'male') {
+                      setConditions((current) => current.filter(
+                        (item) => item !== 'pregnancy' && item !== 'menstruation',
+                      ))
+                    }
+                  }}
                 >
                   {sex[0].toUpperCase() + sex.slice(1)}
                 </button>
@@ -166,6 +222,54 @@ export default function Goals() {
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="card">
+            <label className="field-label">Conditions</label>
+            <p className="muted hint-line">
+              Adjusts micronutrient guidance for pregnancy, diabetes, IBS, and periods.
+            </p>
+            <div className="condition-list">
+              {visibleConditions.map((item) => (
+                <label key={item.id} className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={conditions.includes(item.id)}
+                    onChange={() => toggleCondition(item.id)}
+                  />
+                  <span>{item.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {conditions.includes('pregnancy') && form.sex === 'female' && (
+              <>
+                <label className="field-label">Trimester</label>
+                <div className="segmented">
+                  {[1, 2, 3].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={Number(trimester) === value ? 'is-active' : ''}
+                      onClick={() => setTrimester(value)}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {guidance.length > 0 && (
+              <ul className="guidance-list">
+                {guidance.map((item) => (
+                  <li key={item.label}>
+                    <strong>{item.label}</strong>
+                    <span>{item.summary}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {error && <p className="banner-error">{error}</p>}

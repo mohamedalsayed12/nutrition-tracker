@@ -499,6 +499,79 @@ h2 { font-size: 1.05rem; font-weight: 800; }
 }
 .target-card .btn-green { background: var(--green); }
 
+.hint-line {
+  margin: -0.35rem 0 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.condition-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+}
+.check-row {
+  display: flex !important;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.55rem !important;
+  font-weight: 700;
+}
+.check-row input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--green);
+}
+.guidance-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.guidance-list li {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  background: #f6f6f6;
+}
+.guidance-list strong { font-size: 0.95rem; }
+.guidance-list span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.period-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.85rem;
+}
+.period-card__row p {
+  margin: 0.25rem 0 0;
+  font-size: 0.88rem;
+}
+.toggle-btn {
+  border: 0;
+  min-width: 64px;
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: #ececec;
+  color: var(--muted);
+  font-weight: 800;
+  cursor: pointer;
+}
+.toggle-btn.is-on {
+  background: var(--green);
+  color: #fff;
+}
+.wrap-chips { flex-wrap: wrap; }
+.chip.is-active {
+  background: var(--green);
+  color: #fff;
+}
+
 .bottom-nav {
   position: absolute;
   left: 0.75rem;

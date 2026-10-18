@@ -5,12 +5,16 @@ import BarcodeScanner from '../components/BarcodeScanner'
 import { formatNumber } from '../lib/format'
 import { getSpeechRecognition, speechSupported } from '../lib/speech'
 
-const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
+const MEALS = ['breakfast', 'lunch', 'dinner']
+
+function normalizeMeal(value) {
+  return MEALS.includes(value) ? value : 'dinner'
+}
 
 export default function AddFood() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const [meal, setMeal] = useState(params.get('meal') || 'dinner')
+  const [meal, setMeal] = useState(normalizeMeal(params.get('meal')))
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [frequent, setFrequent] = useState([])
@@ -113,23 +117,23 @@ export default function AddFood() {
           default_meal: defaultMeal,
           auto_log: true,
         })
-        setMeal(result.meal)
+        setMeal(normalizeMeal(result.meal))
         setQuery(result.food_query)
         setGrams(result.grams)
         setResults(result.foods || [])
         if (result.selected) await chooseFood(result.selected, result.grams)
-        setStatus(`Logged ${result.selected?.description || result.food_query} · ${result.grams} g · ${result.meal}`)
+        setStatus(`Logged ${result.selected?.description || result.food_query} · ${result.grams} g · ${normalizeMeal(result.meal)}`)
         window.setTimeout(() => navigate('/app'), 700)
         return
       }
       const parsed = await api.parseVoice({ transcript: text, default_meal: defaultMeal })
-      setMeal(parsed.meal)
+      setMeal(normalizeMeal(parsed.meal))
       setQuery(parsed.food_query)
       setGrams(parsed.grams)
       setResults(parsed.foods || [])
       if (parsed.foods?.[0]) {
         await chooseFood(parsed.foods[0], parsed.grams)
-        setStatus(`Ready to log ${parsed.foods[0].description} · ${parsed.grams} g · ${parsed.meal}`)
+        setStatus(`Ready to log ${parsed.foods[0].description} · ${parsed.grams} g · ${normalizeMeal(parsed.meal)}`)
       } else {
         setStatus(`Understood “${parsed.food_query}” (${parsed.grams} g). Pick a match below.`)
       }

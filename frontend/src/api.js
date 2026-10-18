@@ -58,6 +58,16 @@ export const api = {
   parseVoice: (payload) => request('/api/v1/foods/voice-parse', { method: 'POST', body: payload }),
   logFromVoice: (payload) => request('/api/v1/food-logs/from-voice', { method: 'POST', body: payload }),
   frequentFoods: () => request('/api/v1/foods/frequent'),
+
+  activityLogs: () => request('/api/v1/activity-logs?per_page=100'),
+  createActivityLog: (payload) => request('/api/v1/activity-logs', { method: 'POST', body: payload }),
+  deleteActivityLog: (id) => request(`/api/v1/activity-logs/${id}`, { method: 'DELETE' }),
+
+  getHealth: () => request('/api/v1/settings/health'),
+  setHealth: (payload) => request('/api/v1/settings/health', { method: 'PUT', body: payload }),
+  getDayConditions: (date) => request(`/api/v1/days/${date}/conditions`),
+  setDayConditions: (date, payload) => request(`/api/v1/days/${date}/conditions`, { method: 'PUT', body: payload }),
+  clearDayConditions: (date) => request(`/api/v1/days/${date}/conditions`, { method: 'DELETE' }),
 }
 
 export function nutrientAmount(nutrients, names) {

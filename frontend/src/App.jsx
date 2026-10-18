@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { getToken } from './api'
 import AppShell from './components/AppShell'
+import AddExercise from './pages/AddExercise'
 import AddFood from './pages/AddFood'
 import Goals from './pages/Goals'
 import Login from './pages/Login'
@@ -17,6 +18,7 @@ export default function App() {
       <Route path="/app" element={<AppShell />}>
         <Route index element={<Today />} />
         <Route path="add" element={<AddFood />} />
+        <Route path="exercise" element={<AddExercise />} />
         <Route path="weekly" element={<Weekly />} />
         <Route path="goals" element={<Goals />} />
       </Route>
