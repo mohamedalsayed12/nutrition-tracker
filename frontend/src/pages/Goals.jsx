@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, clearToken } from '../api'
+import MedicalConditions from '../components/MedicalConditions'
 import { formatNumber } from '../lib/format'
 
 const ACTIVITY = [
@@ -9,13 +10,6 @@ const ACTIVITY = [
   'moderately active',
   'very active',
   'extra active',
-]
-
-const HEALTH_CONDITIONS = [
-  { id: 'pregnancy', label: 'Pregnancy' },
-  { id: 'diabetes', label: 'Diabetes' },
-  { id: 'ibs', label: 'IBS' },
-  { id: 'menstruation', label: 'Periods / menstruation' },
 ]
 
 const INITIAL = {
@@ -80,20 +74,6 @@ export default function Goals() {
     setPreview(null)
   }
 
-  function toggleCondition(id) {
-    setConditions((current) => {
-      const has = current.includes(id)
-      let next = has ? current.filter((item) => item !== id) : [...current, id]
-      if (id === 'pregnancy' && !has) {
-        next = next.filter((item) => item !== 'menstruation')
-      }
-      if (id === 'menstruation' && !has) {
-        next = next.filter((item) => item !== 'pregnancy')
-      }
-      return next
-    })
-  }
-
   const macros = useMemo(() => {
     if (!preview) return null
     const calories = preview.calories
@@ -105,13 +85,6 @@ export default function Goals() {
     const fat = calories * fatPct / 100 / 9
     return { calories, protein, proteinPct, carbs, carbsPct, fat, fatPct }
   }, [preview])
-
-  const visibleConditions = HEALTH_CONDITIONS.filter((item) => {
-    if (item.id === 'pregnancy' || item.id === 'menstruation') {
-      return form.sex === 'female'
-    }
-    return true
-  })
 
   async function save(event) {
     event.preventDefault()
@@ -132,17 +105,16 @@ export default function Goals() {
         protein_percent: 25,
         fat_percent: 30,
       })
-
-      const healthPayload = {
-        conditions: form.sex === 'female'
-          ? conditions
-          : conditions.filter((item) => item !== 'pregnancy' && item !== 'menstruation'),
-        trimester: conditions.includes('pregnancy') ? Number(trimester) : null,
+      // Drop sex-incompatible conditions after a sex change.
+      if (form.sex === 'male' && conditions.some((item) => item === 'pregnancy' || item === 'menstruation')) {
+        const health = await api.setHealth({
+          conditions: conditions.filter((item) => item !== 'pregnancy' && item !== 'menstruation'),
+          trimester: null,
+        })
+        setConditions(health.conditions || [])
+        setTrimester(health.trimester || 2)
+        setGuidance(health.guidance || [])
       }
-      const health = await api.setHealth(healthPayload)
-      setConditions(health.conditions || [])
-      setTrimester(health.trimester || 2)
-      setGuidance(health.guidance || [])
       setPreview(result)
     } catch (err) {
       setError(err.message)
@@ -224,53 +196,17 @@ export default function Goals() {
             </div>
           </section>
 
-          <section className="card">
-            <label className="field-label">Conditions</label>
-            <p className="muted hint-line">
-              Adjusts micronutrient guidance for pregnancy, diabetes, IBS, and periods.
-            </p>
-            <div className="condition-list">
-              {visibleConditions.map((item) => (
-                <label key={item.id} className="check-row">
-                  <input
-                    type="checkbox"
-                    checked={conditions.includes(item.id)}
-                    onChange={() => toggleCondition(item.id)}
-                  />
-                  <span>{item.label}</span>
-                </label>
-              ))}
-            </div>
-
-            {conditions.includes('pregnancy') && form.sex === 'female' && (
-              <>
-                <label className="field-label">Trimester</label>
-                <div className="segmented">
-                  {[1, 2, 3].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={Number(trimester) === value ? 'is-active' : ''}
-                      onClick={() => setTrimester(value)}
-                    >
-                      {value}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {guidance.length > 0 && (
-              <ul className="guidance-list">
-                {guidance.map((item) => (
-                  <li key={item.label}>
-                    <strong>{item.label}</strong>
-                    <span>{item.summary}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <MedicalConditions
+            sex={form.sex}
+            conditions={conditions}
+            trimester={trimester}
+            guidance={guidance}
+            onChange={(next) => {
+              setConditions(next.conditions || [])
+              setTrimester(next.trimester || 2)
+              setGuidance(next.guidance || [])
+            }}
+          />
 
           {error && <p className="banner-error">{error}</p>}
 

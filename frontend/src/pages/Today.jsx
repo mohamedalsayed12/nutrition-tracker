@@ -3,17 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, clearToken, macrosFromNutrients } from '../api'
 import CalorieRing from '../components/CalorieRing'
 import MacroBars from '../components/MacroBars'
+import MedicalConditions from '../components/MedicalConditions'
 import { formatDateHeading, formatNumber, progressRow } from '../lib/format'
 
 const MEALS = ['breakfast', 'lunch', 'dinner']
-
-function todayIso() {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 function isSameDay(value, now = new Date()) {
   const logged = new Date(value)
@@ -30,9 +23,9 @@ export default function Today() {
   const [logs, setLogs] = useState([])
   const [activities, setActivities] = useState([])
   const [sex, setSex] = useState(null)
-  const [healthConditions, setHealthConditions] = useState([])
-  const [periodToday, setPeriodToday] = useState(false)
-  const [periodBusy, setPeriodBusy] = useState(false)
+  const [conditions, setConditions] = useState([])
+  const [trimester, setTrimester] = useState(2)
+  const [guidance, setGuidance] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -45,18 +38,17 @@ export default function Today() {
         navigate('/app/goals')
         return
       }
-      const day = todayIso()
-      const [daily, foodLogs, activityLogs, health, dayConditions, nutrition] = await Promise.all([
+      const [daily, foodLogs, activityLogs, health, nutrition] = await Promise.all([
         api.dailyReport(),
         api.foodLogs(),
         api.activityLogs(),
-        api.getHealth().catch(() => ({ conditions: [] })),
-        api.getDayConditions(day).catch(() => ({ conditions: [] })),
+        api.getHealth().catch(() => ({ conditions: [], trimester: null, guidance: [] })),
         api.getNutrition().catch(() => null),
       ])
       setSex(nutrition?.sex || me.profile?.sex || null)
-      setHealthConditions(health.conditions || [])
-      setPeriodToday((dayConditions.conditions || []).includes('menstruation'))
+      setConditions(health.conditions || [])
+      setTrimester(health.trimester || 2)
+      setGuidance(health.guidance || [])
       setReport(daily)
       setLogs((foodLogs.items || []).filter((log) => isSameDay(log.logged_at)))
       setActivities((activityLogs.items || []).filter((log) => isSameDay(log.logged_at)))
@@ -88,27 +80,16 @@ export default function Today() {
   const left = Math.max(target - eaten, 0)
   const percent = target > 0 ? (eaten / target) * 100 : 0
   const exerciseKcal = activities.reduce((sum, item) => sum + (Number(item.calories_burned) || 0), 0)
-  const canLogPeriod = sex === 'female' && !healthConditions.includes('pregnancy')
 
-  async function togglePeriod() {
-    if (!canLogPeriod || periodBusy) return
-    setPeriodBusy(true)
-    setError('')
-    const day = todayIso()
-    const next = !periodToday
+  async function handleConditionsChange(next) {
+    setConditions(next.conditions || [])
+    setTrimester(next.trimester || 2)
+    setGuidance(next.guidance || [])
     try {
-      if (next) {
-        await api.setDayConditions(day, { conditions: ['menstruation'] })
-      } else {
-        await api.clearDayConditions(day)
-      }
-      setPeriodToday(next)
       const daily = await api.dailyReport()
       setReport(daily)
     } catch (err) {
       setError(err.message)
-    } finally {
-      setPeriodBusy(false)
     }
   }
 
@@ -137,25 +118,13 @@ export default function Today() {
             <MacroBars progress={report.progress} />
           </section>
 
-          {canLogPeriod && (
-            <section className="card period-card">
-              <div className="period-card__row">
-                <div>
-                  <h2>Period today</h2>
-                  <p className="muted">Raises iron (+5 mg) and vitamin C (+35 mg) for today</p>
-                </div>
-                <button
-                  type="button"
-                  className={`toggle-btn ${periodToday ? 'is-on' : ''}`}
-                  aria-pressed={periodToday}
-                  disabled={periodBusy}
-                  onClick={togglePeriod}
-                >
-                  {periodToday ? 'On' : 'Off'}
-                </button>
-              </div>
-            </section>
-          )}
+          <MedicalConditions
+            sex={sex}
+            conditions={conditions}
+            trimester={trimester}
+            guidance={guidance}
+            onChange={handleConditionsChange}
+          />
 
           <section className="meal-list">
             {MEALS.map((meal) => {

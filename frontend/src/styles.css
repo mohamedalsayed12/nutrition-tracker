@@ -629,29 +629,11 @@ h2 { font-size: 1.05rem; font-weight: 800; }
   font-weight: 600;
   line-height: 1.35;
 }
-.period-card__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.85rem;
-}
-.period-card__row p {
-  margin: 0.25rem 0 0;
-  font-size: 0.88rem;
-}
-.toggle-btn {
-  border: 0;
-  min-width: 64px;
-  border-radius: 999px;
-  padding: 0.55rem 0.9rem;
-  background: #ececec;
-  color: var(--muted);
+.conditions-card h2 { margin-bottom: 0.35rem; }
+.conditions-card .field-label {
+  display: block;
   font-weight: 800;
-  cursor: pointer;
-}
-.toggle-btn.is-on {
-  background: var(--green);
-  color: #fff;
+  margin: 0.35rem 0 0.55rem;
 }
 .wrap-chips { flex-wrap: wrap; }
 .chip.is-active {

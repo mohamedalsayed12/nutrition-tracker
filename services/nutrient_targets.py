@@ -73,12 +73,12 @@ CONDITION_MICRONUTRIENTS = {
         },
     },
     "menstruation": {
-        "label": "Periods / menstruation",
+        "label": "Period",
         "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
-        "summary": "When you log that you are on your period, iron and vitamin C targets rise for that day. The age/sex reference already averages monthly menstrual iron loss; the day-of bump highlights intake while bleeding and uses vitamin C to support nonheme iron absorption. Heavy periods warrant clinical assessment for iron deficiency.",
+        "summary": "When period is selected as a medical condition, iron and vitamin C targets rise. The age/sex reference already averages monthly menstrual iron loss; this bump highlights intake while bleeding and uses vitamin C to support nonheme iron absorption. Heavy periods warrant clinical assessment for iron deficiency.",
         "nutrients": {
-            "Iron": "Menstrual bleeding increases iron losses. On logged period days the iron target rises by 5 mg above your age/sex reference (or personal override).",
-            "Vitamin C": "Vitamin C helps absorb iron from plant foods. On logged period days the vitamin C target rises by 35 mg to support iron absorption.",
+            "Iron": "Menstrual bleeding increases iron losses. With period selected, the iron target rises by 5 mg above your age/sex reference (or personal override).",
+            "Vitamin C": "Vitamin C helps absorb iron from plant foods. With period selected, the vitamin C target rises by 35 mg to support iron absorption.",
         },
     },
 }
