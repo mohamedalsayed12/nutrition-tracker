@@ -43,7 +43,10 @@ export const api = {
   me: () => request('/api/v1/users/me'),
   setGoal: (goal) => request('/api/v1/goals/goal', { method: 'PUT', body: { goal } }),
   setNutrition: (payload) => request('/api/v1/goals/nutrition', { method: 'PUT', body: payload }),
+  setMacroSplit: (payload) => request('/api/v1/settings/macro-split', { method: 'PUT', body: payload }),
   getNutrition: () => request('/api/v1/goals/nutrition'),
+  getMacroSplit: () => request('/api/v1/settings/macro-split'),
+
   dailyReport: (date) => request(`/api/v1/reports/daily${date ? `?date=${date}` : ''}`),
   weeklyReport: () => request('/api/v1/reports/weekly'),
   foodLogs: () => request('/api/v1/food-logs?per_page=100'),

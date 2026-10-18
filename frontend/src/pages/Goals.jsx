@@ -66,20 +66,13 @@ export default function Goals() {
   const macros = useMemo(() => {
     if (!preview) return null
     const calories = preview.calories
-    const protein = preview.protein_max || preview.protein_min
-    const carbs = preview.carbs
-    const fat = calories && protein != null && carbs != null
-      ? Math.max((calories - protein * 4 - carbs * 4) / 9, 0)
-      : null
-    return {
-      calories,
-      protein,
-      proteinPct: calories ? Math.round((protein * 4 / calories) * 100) : null,
-      carbs,
-      carbsPct: calories ? Math.round((carbs * 4 / calories) * 100) : null,
-      fat,
-      fatPct: calories && fat != null ? Math.round((fat * 9 / calories) * 100) : null,
-    }
+    const proteinPct = 25
+    const carbsPct = 45
+    const fatPct = 30
+    const protein = calories * proteinPct / 100 / 4
+    const carbs = calories * carbsPct / 100 / 4
+    const fat = calories * fatPct / 100 / 9
+    return { calories, protein, proteinPct, carbs, carbsPct, fat, fatPct }
   }, [preview])
 
   async function save(event) {
@@ -96,6 +89,11 @@ export default function Goals() {
         goal: form.goal,
       }
       const result = await api.setNutrition(payload)
+      await api.setMacroSplit({
+        carbs_percent: 45,
+        protein_percent: 25,
+        fat_percent: 30,
+      })
       setPreview(result)
     } catch (err) {
       setError(err.message)
