@@ -58,6 +58,7 @@ The API container applies migrations before starting Gunicorn on port 8000. `/ap
 | `GET /api/v1/users/me` | Read the authenticated user, saved profile, and whether a goal is still needed. |
 | `POST /api/v1/auth/login` | Exchange email and password for an access token. |
 | `GET`, `POST /api/v1/food-logs` | List or create your food logs. |
+| `POST /api/v1/food-logs/from-voice` | Parse spoken text and optionally auto-log the best USDA match (Siri/Assistant-friendly). |
 | `GET`, `PUT`, `DELETE /api/v1/food-logs/{id}` | Read, replace, or delete your food log. |
 | `GET`, `POST /api/v1/activity-logs` | List or create your activity logs. |
 | `GET`, `PUT`, `DELETE /api/v1/activity-logs/{id}` | Read, replace, or delete your activity log. |
@@ -128,7 +129,7 @@ After login, `GET /api/v1/users/me` returns `needs_goal: true` until the user ch
 
 ## Frontend (Harvest)
 
-A React app in `frontend/` provides registration with body metrics, goal setup, Today/Add/Weekly/Goals screens, barcode scan/entry, and voice logging (“180 grams of chicken for dinner”) on Add food.
+A React app in `frontend/` provides registration with body metrics, goal setup, Today/Add/Weekly/Goals screens, barcode scan/entry, and voice logging (“180 grams of chicken for dinner”) on Add food. Deep links and `POST /api/v1/food-logs/from-voice` support logging from **Siri Shortcuts** and **Google Assistant** outside the app — see [`docs/VOICE_ASSISTANTS.md`](docs/VOICE_ASSISTANTS.md).
 
 ```bash
 # terminal 1 — API

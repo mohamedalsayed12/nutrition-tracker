@@ -5,8 +5,9 @@ from database import db
 from models import FoodLog
 from oauth2 import current_user_id
 from routers.common import owned_record, paginated
-from schemas import FoodLogCreate, validate_body
+from schemas import FoodLogCreate, VoiceLogInput, validate_body
 from services.logs import create_food, food_values, invalidate_day, serialize_food
+from services.voice_log import voice_log_for_user
 
 
 router = Blueprint("food_logs", __name__)
@@ -23,6 +24,24 @@ def list_food_logs():
 @validate_body(FoodLogCreate)
 def create_food_log(data):
     return jsonify(serialize_food(create_food(current_user_id(), data))), 201
+
+
+@router.post("/from-voice")
+@jwt_required()
+@validate_body(VoiceLogInput)
+def create_food_log_from_voice(data):
+    """Parse spoken text and log the best USDA match.
+
+    Built for in-app mic use and external assistants (Siri Shortcuts,
+    Android Assistant routines) that can POST a transcript with a bearer token.
+    """
+    result = voice_log_for_user(
+        current_user_id(),
+        data.transcript,
+        default_meal=data.default_meal,
+        auto_log=data.auto_log,
+    )
+    return jsonify(result), 201 if result.get("logged") else 200
 
 
 @router.get("/<int:log_id>")

@@ -100,6 +100,84 @@ export default function AddFood() {
     }
   }, [chooseFood])
 
+  const applyTranscript = useCallback(async (transcript, { autoLog = false, defaultMeal = meal } = {}) => {
+    const text = String(transcript || '').trim()
+    if (!text) return
+    setVoiceNote(text)
+    setStatus(`Heard: “${text}”`)
+    setError('')
+    try {
+      if (autoLog) {
+        const result = await api.logFromVoice({
+          transcript: text,
+          default_meal: defaultMeal,
+          auto_log: true,
+        })
+        setMeal(result.meal)
+        setQuery(result.food_query)
+        setGrams(result.grams)
+        setResults(result.foods || [])
+        if (result.selected) await chooseFood(result.selected, result.grams)
+        setStatus(`Logged ${result.selected?.description || result.food_query} · ${result.grams} g · ${result.meal}`)
+        window.setTimeout(() => navigate('/app'), 700)
+        return
+      }
+      const parsed = await api.parseVoice({ transcript: text, default_meal: defaultMeal })
+      setMeal(parsed.meal)
+      setQuery(parsed.food_query)
+      setGrams(parsed.grams)
+      setResults(parsed.foods || [])
+      if (parsed.foods?.[0]) {
+        await chooseFood(parsed.foods[0], parsed.grams)
+        setStatus(`Ready to log ${parsed.foods[0].description} · ${parsed.grams} g · ${parsed.meal}`)
+      } else {
+        setStatus(`Understood “${parsed.food_query}” (${parsed.grams} g). Pick a match below.`)
+      }
+    } catch (err) {
+      setError(err.message)
+    }
+  }, [chooseFood, meal, navigate])
+
+  useEffect(() => {
+    const transcript = params.get('transcript') || params.get('say') || params.get('q')
+    const barcode = params.get('barcode')
+    const autoLog = params.get('auto_log') === '1' || params.get('autolog') === '1'
+    const speak = params.get('speak') === '1'
+    if (barcode) {
+      lookupBarcode(barcode)
+      return
+    }
+    if (transcript) {
+      applyTranscript(transcript, { autoLog })
+      return
+    }
+    if (speak) {
+      // Defer so the page paints before the mic permission prompt.
+      window.setTimeout(() => {
+        const recognition = getSpeechRecognition()
+        if (!recognition) {
+          setError('Voice logging needs a browser with speech recognition (Chrome works best).')
+          return
+        }
+        setListening(true)
+        setStatus('Listening… tell me what you ate.')
+        recognition.onresult = (event) => {
+          const heard = event.results?.[0]?.[0]?.transcript || ''
+          setListening(false)
+          applyTranscript(heard, { autoLog })
+        }
+        recognition.onerror = () => {
+          setListening(false)
+          setError('Could not hear that. Try again, or type the food.')
+        }
+        recognition.onend = () => setListening(false)
+        recognition.start()
+      }, 250)
+    }
+    // Run once for deep-link / assistant handoff params.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function handleVoice() {
     const recognition = getSpeechRecognition()
     if (!recognition) {
@@ -112,24 +190,8 @@ export default function AddFood() {
     setStatus('Listening… tell me what you ate.')
     recognition.onresult = async (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript || ''
-      setVoiceNote(transcript)
       setListening(false)
-      setStatus(`Heard: “${transcript}”`)
-      try {
-        const parsed = await api.parseVoice({ transcript, default_meal: meal })
-        setMeal(parsed.meal)
-        setQuery(parsed.food_query)
-        setGrams(parsed.grams)
-        setResults(parsed.foods || [])
-        if (parsed.foods?.[0]) {
-          await chooseFood(parsed.foods[0], parsed.grams)
-          setStatus(`Ready to log ${parsed.foods[0].description} · ${parsed.grams} g · ${parsed.meal}`)
-        } else {
-          setStatus(`Understood “${parsed.food_query}” (${parsed.grams} g). Pick a match below.`)
-        }
-      } catch (err) {
-        setError(err.message)
-      }
+      await applyTranscript(transcript)
     }
     recognition.onerror = () => {
       setListening(false)

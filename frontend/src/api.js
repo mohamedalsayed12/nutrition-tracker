@@ -56,6 +56,7 @@ export const api = {
   foodDetail: (fdcId) => request(`/api/v1/foods/${fdcId}`),
   lookupBarcode: (code) => request(`/api/v1/foods/barcode/${encodeURIComponent(code)}`),
   parseVoice: (payload) => request('/api/v1/foods/voice-parse', { method: 'POST', body: payload }),
+  logFromVoice: (payload) => request('/api/v1/food-logs/from-voice', { method: 'POST', body: payload }),
   frequentFoods: () => request('/api/v1/foods/frequent'),
 }
 

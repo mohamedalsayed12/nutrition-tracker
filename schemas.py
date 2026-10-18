@@ -127,6 +127,12 @@ class VoiceParseInput(InputModel):
     default_meal: Literal["breakfast", "lunch", "dinner", "snack"] = "snack"
 
 
+class VoiceLogInput(VoiceParseInput):
+    """Parse speech and optionally create the food log in one call (Siri/Assistant)."""
+
+    auto_log: bool = True
+
+
 class Pagination(InputModel):
     page: int = Field(default=1, ge=1)
     per_page: int = Field(default=20, ge=1, le=100)
