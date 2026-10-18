@@ -104,7 +104,24 @@ class MacroSplitInput(InputModel):
 
 
 DAY_SCOPED_CONDITIONS = Literal["menstruation"]
-HEALTH_CONDITIONS = Literal["pregnancy", "diabetes", "ibs", "menstruation"]
+HEALTH_CONDITIONS = Literal[
+    "pregnancy",
+    "lactation",
+    "menstruation",
+    "menopause",
+    "diabetes",
+    "ibs",
+    "celiac",
+    "crohn_ibd",
+    "vegan",
+    "vegetarian",
+    "anemia_iron",
+    "osteoporosis",
+    "hypertension",
+    "kidney_disease",
+    "bariatric",
+    "thyroid",
+]
 
 
 class HealthSettings(InputModel):
@@ -118,9 +135,14 @@ class HealthSettings(InputModel):
 
     @model_validator(mode="after")
     def validate_conditions(self):
-        if {"pregnancy", "menstruation"}.issubset(self.conditions):
-            raise ValueError("Pregnancy and menstruation cannot both be selected.")
-        if "pregnancy" in self.conditions and self.trimester is None:
+        selected = set(self.conditions)
+        if {"pregnancy", "menstruation"}.issubset(selected):
+            raise ValueError("Pregnancy and period cannot both be selected.")
+        if {"pregnancy", "lactation"}.issubset(selected):
+            raise ValueError("Pregnancy and lactation cannot both be selected.")
+        if {"lactation", "menstruation"}.issubset(selected):
+            raise ValueError("Lactation and period cannot both be selected.")
+        if "pregnancy" in selected and self.trimester is None:
             raise ValueError("Choose a pregnancy trimester.")
         return self
 

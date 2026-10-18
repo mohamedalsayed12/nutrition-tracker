@@ -37,86 +37,374 @@ MICRONUTRIENTS = (
 
 
 PREGNANCY_SOURCE = "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/"
+LACTATION_SOURCE = "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/"
+
+# Female-only reproductive conditions.
+FEMALE_ONLY_CONDITIONS = frozenset({"pregnancy", "lactation", "menstruation", "menopause"})
+
+# Conditions the API / UI accept. Keys must match CONDITION_MICRONUTRIENTS.
+HEALTH_CONDITION_IDS = (
+    "pregnancy",
+    "lactation",
+    "menstruation",
+    "menopause",
+    "diabetes",
+    "ibs",
+    "celiac",
+    "crohn_ibd",
+    "vegan",
+    "vegetarian",
+    "anemia_iron",
+    "osteoporosis",
+    "hypertension",
+    "kidney_disease",
+    "bariatric",
+    "thyroid",
+)
+
 CONDITION_MICRONUTRIENTS = {
     "pregnancy": {
         "label": "Pregnancy",
         "source": PREGNANCY_SOURCE,
-        "summary": "Pregnancy reference targets are applied automatically. Review prenatal nutrition with your care team, including folate, iron, iodine, choline, vitamin D, and calcium.",
+        "summary": "Pregnancy DRI targets replace age/sex defaults for key micronutrients. Review prenatal nutrition with your care team.",
         "nutrients": {
-            "Folate (B9)": "Supports early neural tube development; the published pregnancy reference is 600 mcg DFE/day.",
-            "Iron": "Needs rise with blood volume and fetal development; the published pregnancy reference is 27 mg/day.",
-            "Iodine": "Supports thyroid function and fetal development; the published pregnancy reference is 220 mcg/day.",
-            "Choline": "Supports fetal development; the published pregnancy reference is 450 mg/day.",
-            "Vitamin D": "Supports calcium absorption and bone health; the pregnancy reference remains 15 mcg/day.",
-            "Calcium": "Supports bone health; pregnancy uses 1,300 mg/day for ages 14–18 and 1,000 mg/day for adults.",
+            "Folate (B9)": "Pregnancy reference is 600 mcg DFE/day.",
+            "Iron": "Pregnancy reference is 27 mg/day.",
+            "Iodine": "Pregnancy reference is 220 mcg/day.",
+            "Choline": "Pregnancy reference is 450 mg/day.",
+            "Calcium": "Pregnancy uses 1,300 mg/day (14–18) or 1,000 mg/day (adults).",
+            "Vitamin B12": "Pregnancy reference is 2.6 mcg/day.",
         },
     },
-    "diabetes": {
-        "label": "Diabetes",
-        "source": "https://diabetesjournals.org/care/article/49/Supplement_1/S50/163924/3-Prevention-or-Delay-of-Diabetes-and-Associated",
-        "summary": "If you take metformin long term, discuss periodic vitamin B12 testing with your clinician. Diabetes alone does not set a higher B12 intake target here.",
+    "lactation": {
+        "label": "Lactation / breastfeeding",
+        "source": LACTATION_SOURCE,
+        "summary": "Lactation DRI targets replace age/sex defaults. Iron needs fall while iodine, vitamin A, and several B vitamins rise.",
         "nutrients": {
-            "Vitamin B12": "Long-term metformin use can affect B12 status. Food intake progress cannot show whether B12 absorption or blood levels are adequate.",
-        },
-    },
-    "ibs": {
-        "label": "IBS",
-        "source": "https://www.monashfodmap.com/blog/research-update-occurrence-micronutrient-deficiencies-ibs/",
-        "summary": "Restrictive IBS diets can leave gaps in calcium, iron, folate, thiamin, riboflavin, and magnesium. These keep their usual reference targets; a dietitian can help maintain adequate intake while managing symptoms.",
-        "nutrients": {
-            "Calcium": "Pay attention to calcium adequacy if you restrict dairy; suitable fortified alternatives can help.",
-            "Iron": "Restrictive IBS diets can reduce iron intake; review adequacy against your personal target.",
-            "Folate (B9)": "Restrictive IBS diets can reduce folate intake; review adequacy against your personal target.",
-            "Thiamin (B1)": "Restrictive IBS diets can reduce thiamin intake; review adequacy against your personal target.",
-            "Riboflavin (B2)": "Restrictive IBS diets can reduce riboflavin intake; review adequacy against your personal target.",
-            "Magnesium": "Restrictive IBS diets can reduce magnesium intake; review adequacy against your personal target.",
+            "Vitamin A": "Lactation reference is higher to support milk composition.",
+            "Iodine": "Lactation reference is 290 mcg/day.",
+            "Iron": "Lactation iron reference is lower than pregnancy (about 9–10 mg/day for adults).",
+            "Vitamin C": "Lactation reference is higher than non-lactating adults.",
+            "Vitamin B12": "Lactation reference is 2.8 mcg/day.",
+            "Choline": "Lactation reference is 550 mg/day.",
         },
     },
     "menstruation": {
         "label": "Period",
         "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
-        "summary": "When period is selected as a medical condition, iron and vitamin C targets rise. The age/sex reference already averages monthly menstrual iron loss; this bump highlights intake while bleeding and uses vitamin C to support nonheme iron absorption. Heavy periods warrant clinical assessment for iron deficiency.",
+        "summary": "Raises iron and vitamin C targets while period is selected to highlight intake during bleeding and support nonheme iron absorption.",
         "nutrients": {
-            "Iron": "Menstrual bleeding increases iron losses. With period selected, the iron target rises by 5 mg above your age/sex reference (or personal override).",
-            "Vitamin C": "Vitamin C helps absorb iron from plant foods. With period selected, the vitamin C target rises by 35 mg to support iron absorption.",
+            "Iron": "Iron target rises by 5 mg above your age/sex reference.",
+            "Vitamin C": "Vitamin C target rises by 35 mg to support iron absorption.",
+        },
+    },
+    "menopause": {
+        "label": "Menopause",
+        "source": "https://ods.od.nih.gov/factsheets/Calcium-HealthProfessional/",
+        "summary": "Emphasizes bone-supporting nutrients after menopause. Calcium and vitamin D rise when not already at the higher older-adult band.",
+        "nutrients": {
+            "Calcium": "Target rises toward 1,200 mg/day when below that level.",
+            "Vitamin D": "Target rises toward 20 mcg/day when below that level.",
+            "Magnesium": "Modest bump to support bone and muscle health.",
+            "Vitamin K2": "Modest bump for bone-related tracking.",
+        },
+    },
+    "diabetes": {
+        "label": "Diabetes",
+        "source": "https://diabetesjournals.org/care/article/49/Supplement_1/S50/163924/3-Prevention-or-Delay-of-Diabetes-and-Associated",
+        "summary": "Raises vitamin B12 tracking for metformin-related risk and tightens the sodium limit. Discuss labs with your clinician.",
+        "nutrients": {
+            "Vitamin B12": "Target rises by 0.6 mcg to emphasize B12-rich intake.",
+            "Sodium": "Daily sodium limit tightens to 1,500 mg.",
+            "Chromium": "Modest bump for tracking; food logs cannot confirm glycemic benefit.",
+            "Magnesium": "Modest bump; low magnesium is common with diabetes.",
+        },
+    },
+    "ibs": {
+        "label": "IBS",
+        "source": "https://www.monashfodmap.com/blog/research-update-occurrence-micronutrient-deficiencies-ibs/",
+        "summary": "Restrictive IBS diets often under-deliver calcium, iron, folate, thiamin, riboflavin, and magnesium; targets rise modestly to flag gaps.",
+        "nutrients": {
+            "Calcium": "Target rises by 100 mg.",
+            "Iron": "Target rises by 2 mg.",
+            "Folate (B9)": "Target rises by 50 mcg DFE.",
+            "Thiamin (B1)": "Target rises by 0.2 mg.",
+            "Riboflavin (B2)": "Target rises by 0.2 mg.",
+            "Magnesium": "Target rises by 40 mg.",
+        },
+    },
+    "celiac": {
+        "label": "Celiac disease",
+        "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
+        "summary": "Untreated or newly diagnosed celiac disease is linked to iron, calcium, folate, B12, vitamin D, and zinc shortfalls; targets rise to highlight them.",
+        "nutrients": {
+            "Iron": "Target rises by 4 mg.",
+            "Calcium": "Target rises by 200 mg.",
+            "Folate (B9)": "Target rises by 100 mcg DFE.",
+            "Vitamin B12": "Target rises by 0.6 mcg.",
+            "Vitamin D": "Target rises by 5 mcg.",
+            "Zinc": "Target rises by 2 mg.",
+        },
+    },
+    "crohn_ibd": {
+        "label": "Crohn’s / IBD",
+        "source": "https://ods.od.nih.gov/factsheets/VitaminB12-HealthProfessional/",
+        "summary": "Inflammatory bowel disease commonly affects B12, iron, vitamin D, calcium, zinc, and folate status; targets rise to flag higher needs.",
+        "nutrients": {
+            "Vitamin B12": "Target rises by 1.0 mcg.",
+            "Iron": "Target rises by 4 mg.",
+            "Vitamin D": "Target rises by 10 mcg.",
+            "Calcium": "Target rises by 200 mg.",
+            "Zinc": "Target rises by 3 mg.",
+            "Folate (B9)": "Target rises by 100 mcg DFE.",
+        },
+    },
+    "vegan": {
+        "label": "Vegan",
+        "source": "https://ods.od.nih.gov/factsheets/VitaminB12-HealthProfessional/",
+        "summary": "Strict vegan diets need reliable B12 and careful iron, zinc, calcium, iodine, and vitamin D planning; targets rise accordingly.",
+        "nutrients": {
+            "Vitamin B12": "Target rises by 2.0 mcg (fortified foods or a supplement are typically required).",
+            "Iron": "Target rises by 8 mg to offset lower nonheme absorption.",
+            "Zinc": "Target rises by 3 mg.",
+            "Calcium": "Target rises by 200 mg.",
+            "Iodine": "Target rises by 50 mcg.",
+            "Vitamin D": "Target rises by 5 mcg.",
+        },
+    },
+    "vegetarian": {
+        "label": "Vegetarian",
+        "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
+        "summary": "Lacto-ovo vegetarian patterns can still under-deliver iron, zinc, and B12; targets rise modestly (vegan adjustments replace these if both are selected).",
+        "nutrients": {
+            "Iron": "Target rises by 4 mg.",
+            "Zinc": "Target rises by 2 mg.",
+            "Vitamin B12": "Target rises by 0.6 mcg.",
+        },
+    },
+    "anemia_iron": {
+        "label": "Iron-deficiency anemia",
+        "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
+        "summary": "Raises iron and vitamin C targets. Food tracking cannot replace clinical treatment; follow your clinician’s plan.",
+        "nutrients": {
+            "Iron": "Target rises by 10 mg.",
+            "Vitamin C": "Target rises by 50 mg to support nonheme iron absorption.",
+            "Folate (B9)": "Target rises by 100 mcg DFE.",
+            "Vitamin B12": "Target rises by 0.6 mcg.",
+        },
+    },
+    "osteoporosis": {
+        "label": "Osteoporosis / bone loss",
+        "source": "https://ods.od.nih.gov/factsheets/Calcium-HealthProfessional/",
+        "summary": "Raises calcium, vitamin D, magnesium, and vitamin K2 tracking targets for bone support.",
+        "nutrients": {
+            "Calcium": "Target rises toward at least 1,200 mg/day.",
+            "Vitamin D": "Target rises toward at least 20 mcg/day.",
+            "Magnesium": "Target rises by 50 mg.",
+            "Vitamin K2": "Target rises by 30 mcg.",
+            "Vitamin K": "Target rises by 20 mcg.",
+        },
+    },
+    "hypertension": {
+        "label": "Hypertension",
+        "source": "https://ods.od.nih.gov/factsheets/Sodium-Consumer/",
+        "summary": "Tightens the sodium limit and raises potassium tracking, consistent with DASH-style guidance.",
+        "nutrients": {
+            "Sodium": "Daily sodium limit tightens to 1,500 mg.",
+            "Potassium": "Target rises by 500 mg when below 3,400 mg.",
+            "Magnesium": "Target rises by 40 mg.",
+            "Calcium": "Target rises by 100 mg.",
+        },
+    },
+    "kidney_disease": {
+        "label": "Chronic kidney disease",
+        "source": "https://www.kidney.org/atoz/content/nutrikidfail_stage1-4",
+        "summary": "Lowers potassium, phosphorus, and sodium limits. Individual renal diets vary—use clinician/dietitian targets when they differ.",
+        "nutrients": {
+            "Potassium": "Upper tracking limit set to 2,000 mg.",
+            "Phosphorus": "Upper tracking limit set to 800 mg.",
+            "Sodium": "Daily sodium limit tightens to 1,500 mg.",
+        },
+    },
+    "bariatric": {
+        "label": "Bariatric surgery",
+        "source": "https://ods.od.nih.gov/factsheets/VitaminB12-HealthProfessional/",
+        "summary": "Post-bariatric absorption changes raise B12, iron, calcium, vitamin D, and thiamin tracking targets.",
+        "nutrients": {
+            "Vitamin B12": "Target rises by 2.5 mcg.",
+            "Iron": "Target rises by 8 mg.",
+            "Calcium": "Target rises by 300 mg.",
+            "Vitamin D": "Target rises by 15 mcg.",
+            "Thiamin (B1)": "Target rises by 0.5 mg.",
+            "Folate (B9)": "Target rises by 100 mcg DFE.",
+            "Zinc": "Target rises by 3 mg.",
+        },
+    },
+    "thyroid": {
+        "label": "Thyroid disorder",
+        "source": "https://ods.od.nih.gov/factsheets/Iodine-HealthProfessional/",
+        "summary": "Raises iodine and selenium tracking. Excess iodine can worsen some thyroid conditions—confirm with your clinician.",
+        "nutrients": {
+            "Iodine": "Target rises by 50 mcg.",
+            "Selenium": "Target rises by 10 mcg.",
+            "Iron": "Target rises by 2 mg (iron status can interact with thyroid function).",
+            "Zinc": "Target rises by 2 mg.",
         },
     },
 }
 
 
-# Day-of-period focus adjustments applied when menstruation is active.
-# Female RDAs already average menstrual iron loss across the month; these
-# raise targets on active bleeding days and pair vitamin C for absorption.
-MENSTRUATION_ADJUSTMENTS = {
-    "Iron": {"add": 5.0, "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/"},
-    "Vitamin C": {"add": 35.0, "source": "https://ods.od.nih.gov/factsheets/VitaminC-Consumer/"},
+# Additive / cap adjustments applied after pregnancy/lactation base targets.
+# Keys: add (raise minimum), floor (raise to at least), set_max (lower maximum / set limit).
+CONDITION_TARGET_ADJUSTMENTS = {
+    "menstruation": {
+        "Iron": {"add": 5.0, "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/"},
+        "Vitamin C": {"add": 35.0, "source": "https://ods.od.nih.gov/factsheets/VitaminC-Consumer/"},
+    },
+    "menopause": {
+        "Calcium": {"floor": 1200.0},
+        "Vitamin D": {"floor": 20.0},
+        "Magnesium": {"add": 40.0},
+        "Vitamin K2": {"add": 30.0},
+    },
+    "diabetes": {
+        "Vitamin B12": {"add": 0.6},
+        "Sodium": {"set_max": 1500.0},
+        "Chromium": {"add": 5.0},
+        "Magnesium": {"add": 40.0},
+    },
+    "ibs": {
+        "Calcium": {"add": 100.0},
+        "Iron": {"add": 2.0},
+        "Folate (B9)": {"add": 50.0},
+        "Thiamin (B1)": {"add": 0.2},
+        "Riboflavin (B2)": {"add": 0.2},
+        "Magnesium": {"add": 40.0},
+    },
+    "celiac": {
+        "Iron": {"add": 4.0},
+        "Calcium": {"add": 200.0},
+        "Folate (B9)": {"add": 100.0},
+        "Vitamin B12": {"add": 0.6},
+        "Vitamin D": {"add": 5.0},
+        "Zinc": {"add": 2.0},
+    },
+    "crohn_ibd": {
+        "Vitamin B12": {"add": 1.0},
+        "Iron": {"add": 4.0},
+        "Vitamin D": {"add": 10.0},
+        "Calcium": {"add": 200.0},
+        "Zinc": {"add": 3.0},
+        "Folate (B9)": {"add": 100.0},
+    },
+    "vegan": {
+        "Vitamin B12": {"add": 2.0},
+        "Iron": {"add": 8.0},
+        "Zinc": {"add": 3.0},
+        "Calcium": {"add": 200.0},
+        "Iodine": {"add": 50.0},
+        "Vitamin D": {"add": 5.0},
+    },
+    "vegetarian": {
+        "Iron": {"add": 4.0},
+        "Zinc": {"add": 2.0},
+        "Vitamin B12": {"add": 0.6},
+    },
+    "anemia_iron": {
+        "Iron": {"add": 10.0},
+        "Vitamin C": {"add": 50.0},
+        "Folate (B9)": {"add": 100.0},
+        "Vitamin B12": {"add": 0.6},
+    },
+    "osteoporosis": {
+        "Calcium": {"floor": 1200.0},
+        "Vitamin D": {"floor": 20.0},
+        "Magnesium": {"add": 50.0},
+        "Vitamin K2": {"add": 30.0},
+        "Vitamin K": {"add": 20.0},
+    },
+    "hypertension": {
+        "Sodium": {"set_max": 1500.0},
+        "Potassium": {"add": 500.0},
+        "Magnesium": {"add": 40.0},
+        "Calcium": {"add": 100.0},
+    },
+    "kidney_disease": {
+        "Potassium": {"set_max": 2000.0},
+        "Phosphorus": {"set_max": 800.0},
+        "Sodium": {"set_max": 1500.0},
+    },
+    "bariatric": {
+        "Vitamin B12": {"add": 2.5},
+        "Iron": {"add": 8.0},
+        "Calcium": {"add": 300.0},
+        "Vitamin D": {"add": 15.0},
+        "Thiamin (B1)": {"add": 0.5},
+        "Folate (B9)": {"add": 100.0},
+        "Zinc": {"add": 3.0},
+    },
+    "thyroid": {
+        "Iodine": {"add": 50.0},
+        "Selenium": {"add": 10.0},
+        "Iron": {"add": 2.0},
+        "Zinc": {"add": 2.0},
+    },
 }
 
 
 def condition_micronutrient_guidance(conditions):
-    return [profile for condition, profile in CONDITION_MICRONUTRIENTS.items()
+    return [dict(condition=condition, **profile)
+            for condition, profile in CONDITION_MICRONUTRIENTS.items()
             if condition in (conditions or [])]
 
 
-def apply_condition_target_adjustments(targets, conditions):
-    """Raise micronutrient targets for active medical conditions.
+def _apply_change(row, condition, change):
+    if row.get("custom"):
+        return False
+    current = float(row["target"])
+    changed = False
+    if "add" in change:
+        row["target"] = round(current + float(change["add"]), 1)
+        changed = True
+    if "floor" in change:
+        floor = float(change["floor"])
+        if current < floor or ("add" in change and float(row["target"]) < floor):
+            row["target"] = round(max(float(row["target"]), floor), 1)
+            changed = True
+    if "set_max" in change:
+        row["target"] = round(float(change["set_max"]), 1)
+        row["direction"] = "maximum"
+        changed = True
+    if not changed:
+        return False
+    row["condition_adjusted"] = True
+    row["adjusted_by"] = sorted(set(row.get("adjusted_by") or []) | {condition})
+    if change.get("source"):
+        row["source"] = change["source"]
+    return True
 
-    Personal overrides already applied by the caller are left unchanged.
-    Returns a new list; does not mutate the input rows in place beyond copies.
+
+def apply_condition_target_adjustments(targets, conditions):
+    """Apply additive / floor / max adjustments for active medical conditions.
+
+    Pregnancy and lactation absolute DRIs are applied earlier in micronutrient_targets.
+    Personal overrides (custom=True) are left unchanged.
+    Vegan adjustments replace vegetarian when both are selected.
     """
-    active = set(conditions or [])
-    if "menstruation" not in active:
+    active = [condition for condition in HEALTH_CONDITION_IDS if condition in set(conditions or [])]
+    if "vegan" in active and "vegetarian" in active:
+        active = [condition for condition in active if condition != "vegetarian"]
+    if not active:
         return targets
-    adjusted = []
-    for target in targets:
-        row = dict(target)
-        change = MENSTRUATION_ADJUSTMENTS.get(row["name"])
-        if change and not row.get("custom"):
-            row["target"] = round(float(row["target"]) + change["add"], 1)
-            row["condition_adjusted"] = True
-            row["adjusted_by"] = sorted(set(row.get("adjusted_by") or []) | {"menstruation"})
-            row["source"] = change.get("source") or row.get("source")
-        adjusted.append(row)
+
+    adjusted = [dict(target) for target in targets]
+    by_name = {row["name"]: row for row in adjusted}
+    for condition in active:
+        changes = CONDITION_TARGET_ADJUSTMENTS.get(condition) or {}
+        for nutrient, change in changes.items():
+            row = by_name.get(nutrient)
+            if row is not None:
+                _apply_change(row, condition, change)
     return adjusted
 
 
@@ -152,12 +440,49 @@ PREGNANCY_TARGETS = {
     "Zinc": (12, 11, 11),
 }
 
+# Age bands: <=18, 19–30, 31+ (female lactation DRIs).
+LACTATION_TARGETS = {
+    "Vitamin A": (1200, 1300, 1300),
+    "Thiamin (B1)": (1.4, 1.4, 1.4),
+    "Riboflavin (B2)": (1.6, 1.6, 1.6),
+    "Niacin (B3)": (17, 17, 17),
+    "Pantothenic acid (B5)": (7, 7, 7),
+    "Vitamin B6": (2.0, 2.0, 2.0),
+    "Biotin (B7)": (35, 35, 35),
+    "Folate (B9)": (500, 500, 500),
+    "Vitamin C": (115, 120, 120),
+    "Vitamin D": (15, 15, 15),
+    "Vitamin E": (19, 19, 19),
+    "Vitamin K": (75, 90, 90),
+    "Vitamin K2": (90, 90, 90),
+    "Vitamin B12": (2.8, 2.8, 2.8),
+    "Choline": (550, 550, 550),
+    "Calcium": (1300, 1000, 1000),
+    "Chloride": (2300, 2300, 2300),
+    "Chromium": (44, 45, 45),
+    "Copper": (1.3, 1.3, 1.3),
+    "Fluoride": (3, 3, 3),
+    "Iodine": (290, 290, 290),
+    "Iron": (10, 9, 9),
+    "Magnesium": (360, 310, 320),
+    "Manganese": (2.6, 2.6, 2.6),
+    "Molybdenum": (50, 50, 50),
+    "Phosphorus": (1250, 700, 700),
+    "Potassium": (2500, 2800, 2800),
+    "Selenium": (70, 70, 70),
+    "Zinc": (13, 12, 12),
+}
 
-def micronutrient_targets(age, sex, pregnant=False):
+
+def micronutrient_targets(age, sex, pregnant=False, lactating=False):
     if age < 1 or sex not in ("male", "female"):
         raise ValueError("Enter an age of at least 1 and select male or female.")
+    if pregnant and lactating:
+        raise ValueError("Choose pregnancy or lactation, not both.")
     if pregnant and not 14 <= age <= 50:
         raise ValueError("Pregnancy reference targets are available for ages 14 to 50.")
+    if lactating and not 14 <= age <= 50:
+        raise ValueError("Lactation reference targets are available for ages 14 to 50.")
 
     band = next((index for index, upper in enumerate(AGE_BAND_ENDS) if age <= upper), len(AGE_BAND_ENDS))
     sex_index = 0 if sex == "male" else 1
@@ -167,10 +492,16 @@ def micronutrient_targets(age, sex, pregnant=False):
          "direction": "maximum" if name == "Sodium" else "minimum"}
         for name, unit, _fda_dv, amounts, source in MICRONUTRIENTS
     ]
+
+    life_band = 0 if age <= 18 else 1 if age <= 30 else 2
     if pregnant:
-        pregnancy_band = 0 if age <= 18 else 1 if age <= 30 else 2
         for target in targets:
             if target["name"] in PREGNANCY_TARGETS:
-                target["target"] = PREGNANCY_TARGETS[target["name"]][pregnancy_band]
+                target["target"] = PREGNANCY_TARGETS[target["name"]][life_band]
                 target["source"] = PREGNANCY_SOURCE
+    elif lactating:
+        for target in targets:
+            if target["name"] in LACTATION_TARGETS:
+                target["target"] = LACTATION_TARGETS[target["name"]][life_band]
+                target["source"] = LACTATION_SOURCE
     return targets

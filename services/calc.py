@@ -64,7 +64,8 @@ def configured_micronutrients(age, sex, preferences, extra_conditions=None):
     preference_conditions = (preferences.conditions or []) if preferences is not None else []
     conditions = merge_condition_lists(preference_conditions, extra_conditions)
     pregnant = "pregnancy" in conditions
-    targets = micronutrient_targets(age, sex, pregnant=pregnant)
+    lactating = "lactation" in conditions
+    targets = micronutrient_targets(age, sex, pregnant=pregnant, lactating=lactating)
     overrides = (preferences.micronutrient_overrides or {}) if preferences is not None else {}
     for target in targets:
         if target["name"] in overrides:

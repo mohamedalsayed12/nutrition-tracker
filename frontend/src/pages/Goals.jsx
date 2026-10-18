@@ -106,9 +106,10 @@ export default function Goals() {
         fat_percent: 30,
       })
       // Drop sex-incompatible conditions after a sex change.
-      if (form.sex === 'male' && conditions.some((item) => item === 'pregnancy' || item === 'menstruation')) {
+      const femaleOnly = new Set(['pregnancy', 'lactation', 'menstruation', 'menopause'])
+      if (form.sex === 'male' && conditions.some((item) => femaleOnly.has(item))) {
         const health = await api.setHealth({
-          conditions: conditions.filter((item) => item !== 'pregnancy' && item !== 'menstruation'),
+          conditions: conditions.filter((item) => !femaleOnly.has(item)),
           trimester: null,
         })
         setConditions(health.conditions || [])
@@ -143,7 +144,7 @@ export default function Goals() {
                     update('sex', sex)
                     if (sex === 'male') {
                       setConditions((current) => current.filter(
-                        (item) => item !== 'pregnancy' && item !== 'menstruation',
+                        (item) => !['pregnancy', 'lactation', 'menstruation', 'menopause'].includes(item),
                       ))
                     }
                   }}

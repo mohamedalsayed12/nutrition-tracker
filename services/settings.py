@@ -26,10 +26,18 @@ def set_calories(user_id, calories):
 
 
 def set_health_settings(user_id, data):
+    from services.nutrient_targets import FEMALE_ONLY_CONDITIONS
+
     nutrition = require_nutrition(user_id)
-    if "menstruation" in data.conditions and nutrition.sex != "female":
-        raise ValueError("Menstruation is available when nutrition sex is female.")
-    targets = micronutrient_targets(nutrition.age, nutrition.sex, pregnant="pregnancy" in data.conditions)
+    selected = set(data.conditions)
+    if selected & FEMALE_ONLY_CONDITIONS and nutrition.sex != "female":
+        raise ValueError("Period, pregnancy, lactation, and menopause are available when nutrition sex is female.")
+    targets = micronutrient_targets(
+        nutrition.age,
+        nutrition.sex,
+        pregnant="pregnancy" in selected,
+        lactating="lactation" in selected,
+    )
     allowed = {target["name"] for target in targets}
     if not set(data.micronutrient_overrides).issubset(allowed):
         raise ValueError("Unknown micronutrient override.")

@@ -635,6 +635,9 @@ h2 { font-size: 1.05rem; font-weight: 800; }
   font-weight: 800;
   margin: 0.35rem 0 0.55rem;
 }
+.condition-group { margin-bottom: 0.55rem; }
+.condition-group .density-label { margin-bottom: 0.4rem; }
+.condition-group .condition-list { margin-bottom: 0.35rem; }
 .wrap-chips { flex-wrap: wrap; }
 .chip.is-active {
   background: var(--green);

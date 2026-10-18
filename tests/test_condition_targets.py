@@ -10,8 +10,7 @@ from services.nutrient_scoring import remaining_targets
 
 class ConditionTargetTest(unittest.TestCase):
     def test_periods_raise_iron_and_vitamin_c_but_keep_personal_overrides(self):
-        preferences = SimpleNamespace(conditions=["menstruation", "ibs", "diabetes"],
-                                      micronutrient_overrides={})
+        preferences = SimpleNamespace(conditions=["menstruation"], micronutrient_overrides={})
         for age, base_iron in ((16, 15), (30, 18), (55, 8)):
             baseline = {row["name"]: row for row in micronutrient_targets(age, "female")}
             targets = {row["name"]: row for row in configured_micronutrients(age, "female", preferences)}
@@ -20,6 +19,11 @@ class ConditionTargetTest(unittest.TestCase):
             self.assertTrue(targets["Iron"]["condition_adjusted"])
             self.assertTrue(targets["Vitamin C"]["condition_adjusted"])
             self.assertIn("menstruation", targets["Iron"]["adjusted_by"])
+        # Stacked IBS + diabetes also raise iron beyond the period bump.
+        stacked = SimpleNamespace(conditions=["menstruation", "ibs", "diabetes"],
+                                  micronutrient_overrides={})
+        stacked_targets = {row["name"]: row for row in configured_micronutrients(30, "female", stacked)}
+        self.assertEqual(stacked_targets["Iron"]["target"], 18 + 5 + 2)
         preferences.micronutrient_overrides = {"Iron": 20}
         targets = configured_micronutrients(30, "female", preferences)
         iron = next(row for row in targets if row["name"] == "Iron")
@@ -34,11 +38,13 @@ class ConditionTargetTest(unittest.TestCase):
     def test_pregnancy_targets_and_override_survive_multiple_profiles(self):
         preferences = SimpleNamespace(conditions=["pregnancy", "ibs", "diabetes"],
                                       micronutrient_overrides={"Iron": 30})
-        targets = {row["name"]: row["target"] for row in configured_micronutrients(30, "female", preferences)}
-        self.assertEqual(targets["Iron"], 30)
-        self.assertEqual(targets["Folate (B9)"], 600)
-        self.assertEqual(targets["Iodine"], 220)
-        self.assertEqual(targets["Choline"], 450)
+        targets = {row["name"]: row for row in configured_micronutrients(30, "female", preferences)}
+        self.assertEqual(targets["Iron"]["target"], 30)
+        # Pregnancy DRI 600 + IBS bump 50.
+        self.assertEqual(targets["Folate (B9)"]["target"], 650)
+        self.assertEqual(targets["Iodine"]["target"], 220)
+        self.assertEqual(targets["Choline"]["target"], 450)
+        self.assertEqual(targets["Vitamin B12"]["target"], 2.6 + 0.6)
 
     def test_each_profile_focus_matches_tracked_nutrients_and_overlaps(self):
         profiles = condition_micronutrient_guidance(["pregnancy", "diabetes", "ibs", "menstruation"])
@@ -50,6 +56,38 @@ class ConditionTargetTest(unittest.TestCase):
         overlapping = condition_micronutrient_guidance(["menstruation", "ibs", "menstruation"])
         self.assertEqual(sum("Iron" in profile["nutrients"] for profile in overlapping), 2)
         self.assertEqual(condition_micronutrient_guidance(None), [])
+
+    def test_expanded_conditions_change_targets(self):
+        from services.nutrient_targets import HEALTH_CONDITION_IDS
+
+        baseline = {row["name"]: row for row in micronutrient_targets(30, "female")}
+        for condition in HEALTH_CONDITION_IDS:
+            if condition in {"pregnancy", "lactation"}:
+                continue
+            prefs = SimpleNamespace(conditions=[condition], micronutrient_overrides={})
+            targets = {row["name"]: row for row in configured_micronutrients(30, "female", prefs)}
+            changed = [
+                name for name, row in targets.items()
+                if row["target"] != baseline[name]["target"] or row.get("direction") != baseline[name]["direction"]
+            ]
+            self.assertTrue(changed, f"{condition} should change at least one target")
+
+        vegan = {row["name"]: row for row in configured_micronutrients(
+            30, "female", SimpleNamespace(conditions=["vegan", "vegetarian"], micronutrient_overrides={}))}
+        self.assertEqual(vegan["Vitamin B12"]["target"], baseline["Vitamin B12"]["target"] + 2.0)
+        self.assertNotIn("vegetarian", vegan["Vitamin B12"].get("adjusted_by", []))
+
+        kidney = {row["name"]: row for row in configured_micronutrients(
+            30, "male", SimpleNamespace(conditions=["kidney_disease"], micronutrient_overrides={}))}
+        self.assertEqual(kidney["Potassium"]["target"], 2000)
+        self.assertEqual(kidney["Potassium"]["direction"], "maximum")
+        self.assertEqual(kidney["Sodium"]["target"], 1500)
+
+        lactating = {row["name"]: row["target"] for row in configured_micronutrients(
+            30, "female", SimpleNamespace(conditions=["lactation"], micronutrient_overrides={}))}
+        self.assertEqual(lactating["Iodine"], 290)
+        self.assertEqual(lactating["Iron"], 9)
+        self.assertEqual(lactating["Vitamin B12"], 2.8)
 
     def test_focus_progress_preserves_missing_data_and_uses_personal_target(self):
         preferences = SimpleNamespace(conditions=["menstruation"], micronutrient_overrides={"Iron": 20})

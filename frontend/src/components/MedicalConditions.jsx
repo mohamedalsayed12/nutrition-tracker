@@ -2,11 +2,42 @@ import { useState } from 'react'
 import { api } from '../api'
 
 export const MEDICAL_CONDITIONS = [
-  { id: 'menstruation', label: 'Period', femaleOnly: true },
-  { id: 'pregnancy', label: 'Pregnancy', femaleOnly: true },
-  { id: 'diabetes', label: 'Diabetes', femaleOnly: false },
-  { id: 'ibs', label: 'IBS', femaleOnly: false },
+  { id: 'menstruation', label: 'Period', femaleOnly: true, group: 'Reproductive' },
+  { id: 'pregnancy', label: 'Pregnancy', femaleOnly: true, group: 'Reproductive' },
+  { id: 'lactation', label: 'Lactation / breastfeeding', femaleOnly: true, group: 'Reproductive' },
+  { id: 'menopause', label: 'Menopause', femaleOnly: true, group: 'Reproductive' },
+  { id: 'diabetes', label: 'Diabetes', femaleOnly: false, group: 'Metabolic' },
+  { id: 'hypertension', label: 'Hypertension', femaleOnly: false, group: 'Metabolic' },
+  { id: 'thyroid', label: 'Thyroid disorder', femaleOnly: false, group: 'Metabolic' },
+  { id: 'ibs', label: 'IBS', femaleOnly: false, group: 'Digestive' },
+  { id: 'celiac', label: 'Celiac disease', femaleOnly: false, group: 'Digestive' },
+  { id: 'crohn_ibd', label: 'Crohn’s / IBD', femaleOnly: false, group: 'Digestive' },
+  { id: 'bariatric', label: 'Bariatric surgery', femaleOnly: false, group: 'Digestive' },
+  { id: 'vegan', label: 'Vegan', femaleOnly: false, group: 'Diet' },
+  { id: 'vegetarian', label: 'Vegetarian', femaleOnly: false, group: 'Diet' },
+  { id: 'anemia_iron', label: 'Iron-deficiency anemia', femaleOnly: false, group: 'Nutrient status' },
+  { id: 'osteoporosis', label: 'Osteoporosis / bone loss', femaleOnly: false, group: 'Nutrient status' },
+  { id: 'kidney_disease', label: 'Chronic kidney disease', femaleOnly: false, group: 'Nutrient status' },
 ]
+
+const EXCLUSIVE_PAIRS = [
+  ['pregnancy', 'menstruation'],
+  ['pregnancy', 'lactation'],
+  ['lactation', 'menstruation'],
+]
+
+function withoutConflicts(next, addedId) {
+  let result = next
+  for (const [a, b] of EXCLUSIVE_PAIRS) {
+    if (addedId === a) result = result.filter((item) => item !== b)
+    if (addedId === b) result = result.filter((item) => item !== a)
+  }
+  if (addedId === 'vegan') {
+    // Vegan adjustments supersede vegetarian; keep UI tidy.
+    result = result.filter((item) => item !== 'vegetarian')
+  }
+  return result
+}
 
 export default function MedicalConditions({
   sex,
@@ -23,6 +54,7 @@ export default function MedicalConditions({
     if (item.femaleOnly && sex !== 'female') return false
     return true
   })
+  const groups = [...new Set(visible.map((item) => item.group))]
 
   async function save(nextConditions, nextTrimester = trimester) {
     setBusy(true)
@@ -33,7 +65,6 @@ export default function MedicalConditions({
         trimester: nextConditions.includes('pregnancy') ? Number(nextTrimester || 2) : null,
       }
       const health = await api.setHealth(payload)
-      // Period is managed as a health condition now, not a separate day toggle.
       if (!nextConditions.includes('menstruation')) {
         const now = new Date()
         const day = [
@@ -59,12 +90,7 @@ export default function MedicalConditions({
     if (busy) return
     const has = conditions.includes(id)
     let next = has ? conditions.filter((item) => item !== id) : [...conditions, id]
-    if (id === 'pregnancy' && !has) {
-      next = next.filter((item) => item !== 'menstruation')
-    }
-    if (id === 'menstruation' && !has) {
-      next = next.filter((item) => item !== 'pregnancy')
-    }
+    if (!has) next = withoutConflicts(next, id)
     save(next, trimester)
   }
 
@@ -77,22 +103,27 @@ export default function MedicalConditions({
     <section className={`card conditions-card ${compact ? 'is-compact' : ''}`}>
       <h2>Medical conditions</h2>
       <p className="muted hint-line">
-        Adjusts nutrient targets for period, pregnancy, diabetes, IBS, and related needs.
+        Select every condition that should change your nutrient targets. Guidance updates instantly.
       </p>
 
-      <div className="condition-list">
-        {visible.map((item) => (
-          <label key={item.id} className="check-row">
-            <input
-              type="checkbox"
-              checked={conditions.includes(item.id)}
-              disabled={busy}
-              onChange={() => toggle(item.id)}
-            />
-            <span>{item.label}</span>
-          </label>
-        ))}
-      </div>
+      {groups.map((group) => (
+        <div key={group} className="condition-group">
+          <p className="density-label">{group}</p>
+          <div className="condition-list">
+            {visible.filter((item) => item.group === group).map((item) => (
+              <label key={item.id} className="check-row">
+                <input
+                  type="checkbox"
+                  checked={conditions.includes(item.id)}
+                  disabled={busy}
+                  onChange={() => toggle(item.id)}
+                />
+                <span>{item.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
 
       {conditions.includes('pregnancy') && sex === 'female' && (
         <>
@@ -116,7 +147,7 @@ export default function MedicalConditions({
       {guidance.length > 0 && (
         <ul className="guidance-list">
           {guidance.map((item) => (
-            <li key={item.label}>
+            <li key={item.condition || item.label}>
               <strong>{item.label}</strong>
               <span>{item.summary}</span>
             </li>
