@@ -122,6 +122,11 @@ class DayConditions(InputModel):
     conditions: list[DAY_SCOPED_CONDITIONS] = Field(default_factory=list)
 
 
+class VoiceParseInput(InputModel):
+    transcript: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=280)]
+    default_meal: Literal["breakfast", "lunch", "dinner", "snack"] = "snack"
+
+
 class Pagination(InputModel):
     page: int = Field(default=1, ge=1)
     per_page: int = Field(default=20, ge=1, le=100)

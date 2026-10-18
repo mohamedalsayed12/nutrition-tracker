@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, macrosFromNutrients } from '../api'
+import BarcodeScanner from '../components/BarcodeScanner'
 import { formatNumber } from '../lib/format'
+import { getSpeechRecognition, speechSupported } from '../lib/speech'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -16,8 +18,13 @@ export default function AddFood() {
   const [detail, setDetail] = useState(null)
   const [grams, setGrams] = useState(100)
   const [error, setError] = useState('')
+  const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [listening, setListening] = useState(false)
+  const [voiceNote, setVoiceNote] = useState('')
+  const canSpeak = speechSupported()
 
   useEffect(() => {
     api.frequentFoods()
@@ -56,17 +63,80 @@ export default function AddFood() {
     return () => window.clearTimeout(handle)
   }, [query])
 
-  async function chooseFood(food) {
+  const chooseFood = useCallback(async (food, nextGrams) => {
     setSelected(food)
     setError('')
+    setStatus(`Selected ${food.description}`)
     try {
       const data = await api.foodDetail(food.fdc_id)
       setDetail(data)
-      setGrams(food.grams || 100)
+      setGrams(nextGrams || food.grams || 100)
     } catch (err) {
       setDetail(null)
       setError(err.message)
     }
+  }, [])
+
+  const lookupBarcode = useCallback(async (code) => {
+    setScanning(false)
+    setSearching(true)
+    setError('')
+    setStatus(`Looking up barcode ${code}…`)
+    try {
+      const data = await api.lookupBarcode(code)
+      setQuery(code)
+      setResults(data.foods || [])
+      if (data.foods?.[0]) {
+        await chooseFood(data.foods[0])
+        setStatus(data.product_hint
+          ? `Matched via ${data.product_hint}`
+          : 'Barcode matched. Adjust grams, then add.')
+      }
+    } catch (err) {
+      setError(err.message)
+      setStatus('')
+    } finally {
+      setSearching(false)
+    }
+  }, [chooseFood])
+
+  async function handleVoice() {
+    const recognition = getSpeechRecognition()
+    if (!recognition) {
+      setError('Voice logging needs a browser with speech recognition (Chrome works best).')
+      return
+    }
+    setError('')
+    setVoiceNote('')
+    setListening(true)
+    setStatus('Listening… tell me what you ate.')
+    recognition.onresult = async (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || ''
+      setVoiceNote(transcript)
+      setListening(false)
+      setStatus(`Heard: “${transcript}”`)
+      try {
+        const parsed = await api.parseVoice({ transcript, default_meal: meal })
+        setMeal(parsed.meal)
+        setQuery(parsed.food_query)
+        setGrams(parsed.grams)
+        setResults(parsed.foods || [])
+        if (parsed.foods?.[0]) {
+          await chooseFood(parsed.foods[0], parsed.grams)
+          setStatus(`Ready to log ${parsed.foods[0].description} · ${parsed.grams} g · ${parsed.meal}`)
+        } else {
+          setStatus(`Understood “${parsed.food_query}” (${parsed.grams} g). Pick a match below.`)
+        }
+      } catch (err) {
+        setError(err.message)
+      }
+    }
+    recognition.onerror = () => {
+      setListening(false)
+      setError('Could not hear that. Try again, or type the food.')
+    }
+    recognition.onend = () => setListening(false)
+    recognition.start()
   }
 
   const portion = useMemo(() => {
@@ -116,10 +186,31 @@ export default function AddFood() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search foods"
+          placeholder="Search foods or paste a barcode"
           aria-label="Search foods"
         />
       </div>
+
+      <div className="action-row">
+        <button type="button" className="action-chip" onClick={() => setScanning(true)}>
+          Scan barcode
+        </button>
+        <button
+          type="button"
+          className={`action-chip ${listening ? 'is-live' : ''}`}
+          onClick={handleVoice}
+          disabled={listening}
+        >
+          {listening ? 'Listening…' : canSpeak ? 'Speak what you ate' : 'Voice unavailable'}
+        </button>
+      </div>
+
+      {scanning && (
+        <BarcodeScanner
+          onDetected={lookupBarcode}
+          onClose={() => setScanning(false)}
+        />
+      )}
 
       <div className="meal-pills" role="tablist" aria-label="Meal">
         {MEALS.map((item) => (
@@ -146,6 +237,8 @@ export default function AddFood() {
         </div>
       )}
 
+      {voiceNote && <p className="voice-note">“{voiceNote}”</p>}
+      {status && <p className="status-note">{status}</p>}
       {error && <p className="banner-error">{error}</p>}
       {searching && <p className="muted">Searching…</p>}
 
@@ -185,14 +278,14 @@ export default function AddFood() {
       <section className="card results-card">
         <h2>More results</h2>
         {results.length === 0 ? (
-          <p className="muted">Search to find foods from USDA FoodData Central.</p>
+          <p className="muted">Search, scan a barcode, or say something like “180 grams of chicken for dinner”.</p>
         ) : (
           <ul className="result-list">
             {results.map((food) => (
               <li key={food.fdc_id}>
                 <button type="button" onClick={() => chooseFood(food)}>
                   <span>{food.description}</span>
-                  <small>{food.data_type || 'Food'}</small>
+                  <small>{food.brand_name || food.data_type || 'Food'}{food.gtin_upc ? ` · ${food.gtin_upc}` : ''}</small>
                 </button>
               </li>
             ))}

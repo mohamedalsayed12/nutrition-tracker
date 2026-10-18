@@ -67,6 +67,8 @@ The API container applies migrations before starting Gunicorn on port 8000. `/ap
 | `GET`, `PUT /api/v1/settings/health` | Read or replace health preferences and personal targets. |
 | `GET`, `PUT`, `DELETE /api/v1/settings/macro-split` | Read, replace, or reset macro percentages. |
 | `GET /api/v1/foods?q=...` | Search USDA foods, optionally personalized with a token. |
+| `GET /api/v1/foods/barcode/{code}` | Look up a packaged food by barcode (USDA GTIN, with Open Food Facts name fallback). |
+| `POST /api/v1/foods/voice-parse` | Parse a spoken food log into meal, grams, search query, and match suggestions. |
 | `GET /api/v1/foods/{fdc_id}/measures` | Read serving size conversions. |
 | `GET /api/v1/foods/frequent` | Read your frequently logged foods. |
 | `GET /api/v1/exercises?q=...` | Search exercise names. |
@@ -126,7 +128,7 @@ After login, `GET /api/v1/users/me` returns `needs_goal: true` until the user ch
 
 ## Frontend (Harvest)
 
-A React app in `frontend/` provides registration with body metrics, a goal picker, and a sticky top **macro progress bar** that fills as logged intake approaches calorie, protein, carb, and fat targets.
+A React app in `frontend/` provides registration with body metrics, goal setup, Today/Add/Weekly/Goals screens, barcode scan/entry, and voice logging (“180 grams of chicken for dinner”) on Add food.
 
 ```bash
 # terminal 1 — API

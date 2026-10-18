@@ -230,6 +230,63 @@ h2 { font-size: 1.05rem; font-weight: 800; }
 }
 .search-box span { color: var(--muted); font-size: 1.1rem; }
 
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+}
+.action-chip {
+  border: 0;
+  border-radius: 16px;
+  padding: 0.8rem 0.75rem;
+  background: #fff;
+  box-shadow: var(--shadow);
+  font-weight: 800;
+  cursor: pointer;
+}
+.action-chip.is-live {
+  background: #1b1b1b;
+  color: #fff;
+}
+.voice-note, .status-note {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.scanner-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.text-btn {
+  border: 0;
+  background: transparent;
+  color: var(--green-deep);
+  font-weight: 800;
+  cursor: pointer;
+}
+.scanner-video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 16px;
+  background: #111;
+  margin-bottom: 0.75rem;
+}
+.barcode-manual {
+  display: grid;
+  gap: 0.55rem;
+}
+.barcode-manual input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  background: #fafafa;
+}
+
 .meal-pills, .segmented, .chip-row {
   display: flex;
   flex-wrap: wrap;

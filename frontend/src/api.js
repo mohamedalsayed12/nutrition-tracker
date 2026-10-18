@@ -54,6 +54,8 @@ export const api = {
   deleteFoodLog: (id) => request(`/api/v1/food-logs/${id}`, { method: 'DELETE' }),
   searchFoods: (q) => request(`/api/v1/foods?q=${encodeURIComponent(q)}`),
   foodDetail: (fdcId) => request(`/api/v1/foods/${fdcId}`),
+  lookupBarcode: (code) => request(`/api/v1/foods/barcode/${encodeURIComponent(code)}`),
+  parseVoice: (payload) => request('/api/v1/foods/voice-parse', { method: 'POST', body: payload }),
   frequentFoods: () => request('/api/v1/foods/frequent'),
 }
 
