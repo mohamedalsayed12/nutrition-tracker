@@ -119,10 +119,15 @@ def weekly_report(user_id, week_start, zone):
     )
 
 
-def frequent_foods(user_id):
+def frequent_foods(user_id, meal=None):
+    from services.food_search import popular_logged_foods
+
     foods = db.session.query(FoodLog).filter_by(user_id=user_id).order_by(FoodLog.logged_at.desc()).all()
     choices = frequent_food_choices(foods)
     for items in choices.values():
         for item in items:
             item["last_logged"] = iso_utc(item["last_logged"])
-    return choices
+    popular = popular_logged_foods(user_id, meal=meal, limit=12)
+    for item in popular:
+        item["last_logged"] = iso_utc(item["last_logged"])
+    return dict(by_meal=choices, popular=popular)

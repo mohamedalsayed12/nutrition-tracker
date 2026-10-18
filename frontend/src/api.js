@@ -57,7 +57,10 @@ export const api = {
   lookupBarcode: (code) => request(`/api/v1/foods/barcode/${encodeURIComponent(code)}`),
   parseVoice: (payload) => request('/api/v1/foods/voice-parse', { method: 'POST', body: payload }),
   logFromVoice: (payload) => request('/api/v1/food-logs/from-voice', { method: 'POST', body: payload }),
-  frequentFoods: () => request('/api/v1/foods/frequent'),
+  frequentFoods: (meal) => {
+    const params = meal ? `?meal=${encodeURIComponent(meal)}` : ''
+    return request(`/api/v1/foods/frequent${params}`)
+  },
 
   activityLogs: () => request('/api/v1/activity-logs?per_page=100'),
   createActivityLog: (payload) => request('/api/v1/activity-logs', { method: 'POST', body: payload }),

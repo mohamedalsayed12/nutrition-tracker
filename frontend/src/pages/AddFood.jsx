@@ -17,7 +17,8 @@ export default function AddFood() {
   const [meal, setMeal] = useState(normalizeMeal(params.get('meal')))
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
-  const [frequent, setFrequent] = useState([])
+  const [popular, setPopular] = useState([])
+  const [mealFrequent, setMealFrequent] = useState([])
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
   const [grams, setGrams] = useState(100)
@@ -31,20 +32,21 @@ export default function AddFood() {
   const canSpeak = speechSupported()
 
   useEffect(() => {
-    api.frequentFoods()
+    let active = true
+    api.frequentFoods(meal)
       .then((data) => {
-        const items = Object.values(data.foods || {}).flat()
-        const unique = []
-        const seen = new Set()
-        for (const item of items) {
-          if (seen.has(item.fdc_id)) continue
-          seen.add(item.fdc_id)
-          unique.push(item)
-        }
-        setFrequent(unique.slice(0, 6))
+        if (!active) return
+        setPopular(data.popular || [])
+        const forMeal = data.foods?.[meal] || []
+        setMealFrequent(forMeal.slice(0, 8))
       })
-      .catch(() => setFrequent([]))
-  }, [])
+      .catch(() => {
+        if (!active) return
+        setPopular([])
+        setMealFrequent([])
+      })
+    return () => { active = false }
+  }, [meal])
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -301,20 +303,48 @@ export default function AddFood() {
         ))}
       </div>
 
-      {frequent.length > 0 && (
-        <div className="chip-row">
-          {frequent.map((item) => (
-            <button key={item.fdc_id} type="button" className="chip" onClick={() => chooseFood(item)}>
-              {item.description}
-            </button>
-          ))}
-        </div>
+      {mealFrequent.length > 0 && (
+        <section className="popular-block">
+          <p className="density-label">Frequent for {meal}</p>
+          <div className="chip-row">
+            {mealFrequent.map((item) => (
+              <button
+                key={`meal-${item.fdc_id}`}
+                type="button"
+                className="chip"
+                onClick={() => chooseFood(item, item.grams)}
+              >
+                {item.description}
+                {item.count > 1 && <em>×{item.count}</em>}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {query.trim().length < 2 && popular.length > 0 && (
+        <section className="card popular-card">
+          <h2>Most logged</h2>
+          <ul className="result-list">
+            {popular.map((item) => (
+              <li key={`popular-${item.fdc_id}`}>
+                <button type="button" onClick={() => chooseFood(item, item.grams)}>
+                  <span>{item.description}</span>
+                  <small>
+                    Logged {item.count}×
+                    {item.grams != null ? ` · ${formatNumber(item.grams, 0)} g usual` : ''}
+                  </small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {voiceNote && <p className="voice-note">“{voiceNote}”</p>}
       {status && <p className="status-note">{status}</p>}
       {error && <p className="banner-error">{error}</p>}
-      {searching && <p className="muted">Searching…</p>}
+      {searching && <p className="muted">Searching USDA…</p>}
 
       {detail && selected && (
         <form className="card food-detail" onSubmit={addFood}>
@@ -389,16 +419,26 @@ export default function AddFood() {
       )}
 
       <section className="card results-card">
-        <h2>More results</h2>
-        {results.length === 0 ? (
-          <p className="muted">Search, scan a barcode, or say something like “180 grams of chicken for dinner”.</p>
+        <h2>{query.trim().length >= 2 ? 'Search results' : 'Find a food'}</h2>
+        {query.trim().length < 2 ? (
+          <p className="muted">Search USDA foods, scan a barcode, or say something like “180 grams of chicken for dinner”.</p>
+        ) : results.length === 0 && !searching ? (
+          <p className="muted">No accurate matches. Try a simpler name, brand, or barcode.</p>
         ) : (
           <ul className="result-list">
             {results.map((food) => (
               <li key={food.fdc_id}>
                 <button type="button" onClick={() => chooseFood(food)}>
-                  <span>{food.description}</span>
-                  <small>{food.brand_name || food.data_type || 'Food'}{food.gtin_upc ? ` · ${food.gtin_upc}` : ''}</small>
+                  <span>
+                    {food.description}
+                    {food.previously_logged && (
+                      <em className="logged-pill">Logged {food.log_count}×</em>
+                    )}
+                  </span>
+                  <small>
+                    {food.brand_name || food.data_type || 'Food'}
+                    {food.gtin_upc ? ` · ${food.gtin_upc}` : ''}
+                  </small>
                 </button>
               </li>
             ))}

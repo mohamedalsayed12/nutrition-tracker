@@ -50,7 +50,12 @@ def weekly():
 @router.get("/foods/frequent")
 @jwt_required()
 def frequent():
-    return jsonify(foods=frequent_foods(current_user_id()))
+    meal = (request.args.get("meal") or "").strip().lower() or None
+    if meal and meal not in {"breakfast", "lunch", "dinner", "snack"}:
+        abort(400, description="meal must be breakfast, lunch, dinner, or snack.")
+    payload = frequent_foods(current_user_id(), meal=meal)
+    # Keep meal buckets at top level for older clients; popular is most-logged overall.
+    return jsonify(foods=payload["by_meal"], popular=payload["popular"], meal=meal)
 
 
 @router.get("/nutrients/food-recommendations")

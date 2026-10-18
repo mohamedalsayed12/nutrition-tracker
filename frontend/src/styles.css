@@ -308,7 +308,27 @@ h2 { font-size: 1.05rem; font-weight: 800; }
   background: #171717;
   color: #fff;
 }
-.chip { background: #fff; box-shadow: var(--shadow); }
+.chip { background: #fff; box-shadow: var(--shadow); display: inline-flex; align-items: center; gap: 0.35rem; }
+.chip em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 800;
+}
+.popular-block { margin-bottom: 0.85rem; }
+.popular-card h2 { margin-bottom: 0.55rem; }
+.logged-pill {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: #e8f2ec;
+  color: var(--green-deep);
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
 
 .food-detail h2 { margin-bottom: 0.25rem; }
 .food-detail__head {
