@@ -1,5 +1,5 @@
-
-from imports import math, re
+import math
+import re
 
 
 def _name(value):
@@ -49,7 +49,7 @@ def _target_name(value):
 
 
 def _unit(value):
-    return str(value).lower().strip().replace("µ", "u").replace("μ", "u").replace("�", "u")
+    return str(value).lower().strip().replace("Ã‚Âµ", "u").replace("ÃŽÂ¼", "u").replace("Ã¯Â¿Â½", "u")
 
 
 def _convert(amount, source_unit, target_unit):
@@ -99,7 +99,7 @@ def _energy_per_100g(nutrients):
 
 def npc_rating(nutrients, targets, daily_calories, npc):
     if not targets or not daily_calories or daily_calories <= 0:
-        return {"score": None, "reasons": ["Calculate your UserInfo targets to rate this food."]}
+        return {"score": None, "reasons": ["Calculate your nutrition targets to rate this food."]}
     energy = _energy_per_100g(nutrients)
     if energy is None:
         return {"score": None, "reasons": ["This food has no usable energy value in kcal."]}
@@ -147,6 +147,6 @@ def remaining_targets(food_logs, targets):
         percent = round(totals[name] / item["target"] * 100, 1) if known and item["target"] > 0 else None
         rows.append({"name": name, "unit": item["unit"], "target": item["target"], "limit": limit,
                      "logged": logged, "remaining": round(max(item["target"] - totals[name], 0), 2) if known else None,
-                     "percent": percent, "bar_width": min(percent, 100) if percent is not None else 0,
+                     "percent": percent,
                      "partial": 0 < reported[name] < len(food_logs)})
     return rows

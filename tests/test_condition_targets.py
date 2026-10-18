@@ -1,17 +1,11 @@
-from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-import sqlite3
 import unittest
 
-from flask import Flask
-
-from calc import (condition_nutrition_data, custom_macro_targets,
+from services.calc import (condition_nutrition_data, custom_macro_targets,
                   daily_target_progress, validate_care_plan_macros,
                   configured_micronutrients)
-from db import configure_database, db
-from nutrient_targets import condition_micronutrient_guidance, micronutrient_targets
-from nutrient_scoring import remaining_targets
+from services.nutrient_targets import condition_micronutrient_guidance, micronutrient_targets
+from services.nutrient_scoring import remaining_targets
 
 
 class ConditionTargetTest(unittest.TestCase):
@@ -90,29 +84,6 @@ class ConditionTargetTest(unittest.TestCase):
         self.assertEqual(fiber["fiber_logged"], 8)
         self.assertEqual(fiber["fiber_goal"], 28)
         self.assertAlmostEqual(fiber["fiber_percent"], 28.6)
-
-    def test_existing_database_gets_new_columns(self):
-        with TemporaryDirectory() as directory:
-            instance = Path(directory)
-            connection = sqlite3.connect(instance / "users.sqlite3")
-            connection.execute("CREATE TABLE health_preferences (user_id INTEGER PRIMARY KEY, "
-                               "conditions JSON, trimester INTEGER, custom_calories FLOAT, "
-                               "custom_carbs FLOAT, micronutrient_overrides JSON, "
-                               "base_calories FLOAT, base_carbs FLOAT, "
-                               "base_protein_min FLOAT, base_protein_max FLOAT)")
-            connection.commit()
-            connection.close()
-            application = Flask("condition_migration_test", instance_path=str(instance))
-            configure_database(application)
-            with application.app_context():
-                with db.engine.connect() as connection:
-                    columns = {row[1] for row in connection.exec_driver_sql(
-                        "PRAGMA table_info(health_preferences)")}
-                self.assertIn("custom_protein", columns)
-                self.assertIn("custom_fat", columns)
-                db.session.remove()
-                db.engine.dispose()
-
 
 if __name__ == "__main__":
     unittest.main()

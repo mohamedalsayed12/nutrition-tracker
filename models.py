@@ -1,7 +1,7 @@
-from imports import datetime, timezone, UserMixin
-from db import db
+from datetime import datetime, timezone
+from database import db
 
-class User(db.Model, UserMixin):
+class User(db.Model):
     __tablename__ = 'users'
 
     uid = db.Column(db.Integer, primary_key=True)
@@ -11,10 +11,6 @@ class User(db.Model, UserMixin):
 
     def __repr__(self):
         return f'<User: {self.username}>'
-
-    def get_id(self):
-        return str(self.uid)
-
 
 class CalorieTarget(db.Model):
     __tablename__ = "calorie_targets"
