@@ -177,3 +177,21 @@ def test_health_settings_menstruation_persists_raised_micronutrients(client):
     assert micros["Iron"]["target"] == 23
     assert micros["Vitamin C"]["target"] == 110
     assert micros["Iron"].get("condition_adjusted") is True
+
+
+def test_food_recommendations_include_vitamin_k2_and_deficiency_advice(client):
+    headers = register_and_login(client, "k2@example.com")
+    assert client.put("/api/v1/goals/nutrition", json={
+        "age": 30, "sex": "female", "height_cm": 165,
+        "weight_kg": 60, "activity_level": "moderately active", "goal": "maintain",
+    }, headers=headers).status_code == 200
+    catalog = client.get("/api/v1/nutrients/food-recommendations", headers=headers)
+    assert catalog.status_code == 200
+    assert "Vitamin K2" in catalog.json["recommendations"]
+    assert catalog.json["recommendations"]["Iron"]
+    day = datetime.now(timezone.utc).date().isoformat()
+    report = client.get(f"/api/v1/reports/daily?date={day}", headers=headers).json
+    k2 = next(row for row in report["micronutrients"] if row["name"] == "Vitamin K2")
+    assert k2["target"] == 90
+    assert "food_recommendations" in k2
+    assert "nutrient_advice" in report
