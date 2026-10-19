@@ -3,6 +3,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from services.calc import food_measures
 from services.food_search import get_food_client, search_exercises, search_foods
+from usda_fdc import FdcResourceNotFoundError
 
 
 router = Blueprint("foods", __name__)
@@ -24,6 +25,8 @@ def measures(fdc_id):
         abort(503, description=str(error))
     try:
         food = client.get_food(fdc_id)
+    except FdcResourceNotFoundError:
+        abort(404, description="USDA food not found.")
     except Exception:
         abort(502, description="Serving sizes are temporarily unavailable.")
     return jsonify(measures=food_measures(food))

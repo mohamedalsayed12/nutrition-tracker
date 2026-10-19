@@ -1,29 +1,13 @@
-from datetime import datetime, time, timedelta, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from datetime import timedelta
 
 from database import db
 from models import ActivityLog, CalorieTarget, FoodLog, HealthPreferences, MacroSplit, NutritionTargets, UserActivityBaseline
 from services.calc import (condition_nutrition_data, configured_micronutrients,
                            daily_target_progress, frequent_food_choices)
+from services.dates import as_utc, day_range, report_timezone  # noqa: F401 (re-exported for routers)
 from services.nutrient_scoring import remaining_targets
 from services.weekly_recap import build_weekly_recap, food_macros
 from services.logs import iso_utc
-
-
-def report_timezone(name):
-    try:
-        return ZoneInfo(name)
-    except (ZoneInfoNotFoundError, ValueError):
-        raise ValueError("Choose a valid IANA timezone.") from None
-
-
-def as_utc(value):
-    return value.replace(tzinfo=value.tzinfo or timezone.utc).astimezone(timezone.utc)
-
-
-def day_range(day, zone):
-    start = datetime.combine(day, time.min, zone)
-    return start.astimezone(timezone.utc), (start + timedelta(days=1)).astimezone(timezone.utc)
 
 
 def daily_report(user_id, day, zone):

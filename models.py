@@ -44,7 +44,7 @@ class UserActivityBaseline(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
     activity_level = db.Column(db.String(30), nullable=False)
-    changed_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    changed_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class MacroSplit(db.Model):
@@ -73,13 +73,6 @@ class HealthPreferences(db.Model):
     base_protein_max = db.Column(db.Float, nullable=True)
 
 
-class MealSubmission(db.Model):
-    __tablename__ = "meal_submissions"
-
-    user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
-    token = db.Column(db.String(64), primary_key=True)
-
-
 class FoodLog(db.Model):
     __tablename__ = "food_logs"
 
@@ -91,7 +84,7 @@ class FoodLog(db.Model):
     grams = db.Column(db.Float, nullable=False)
     nutrients = db.Column(db.JSON, nullable=False)
     logged_at = db.Column(
-        db.DateTime,
+        db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
@@ -102,7 +95,10 @@ class SavedEatingDay(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), primary_key=True)
     day = db.Column(db.Date, primary_key=True)
-    saved_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    # The IANA timezone the day was saved in, so "this day" means the same
+    # 24 hours when the save is checked later.
+    timezone = db.Column(db.String(64), nullable=False, default="UTC", server_default="UTC")
+    saved_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class ActivityLog(db.Model):
@@ -114,7 +110,7 @@ class ActivityLog(db.Model):
     details = db.relationship("ExerciseDetails", uselist=False, cascade="all, delete-orphan")
     target_credit = db.relationship("ExerciseTargetCredit", uselist=False, cascade="all, delete-orphan")
     logged_at = db.Column(
-        db.DateTime,
+        db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
