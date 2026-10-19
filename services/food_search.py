@@ -5,6 +5,9 @@ import requests
 from flask import abort
 from usda_fdc import FdcClient, FdcResourceNotFoundError
 
+from database import db
+from models import FoodLog
+
 
 def get_food_client():
     api_key = os.getenv("FDC_API_KEY")
@@ -67,11 +70,23 @@ def search_foods(query, user_id=None):
         abort(503, description="Food search is not configured.")
     try:
         ordered = _find_foods(get_food_client(), query)
-        return [dict(fdc_id=food.fdc_id, description=food.description,
-                     data_type=food.data_type, brand_name=food.brand_name,
-                     gtin_upc=getattr(food, "gtin_upc", None)) for food in ordered]
     except Exception:
         abort(502, description="Food search is temporarily unavailable.")
+    logged = _previously_logged(user_id, [food.fdc_id for food in ordered])
+    # Signed-in users see foods they have logged before first, keeping USDA's order otherwise.
+    ordered = sorted(ordered, key=lambda food: food.fdc_id not in logged)
+    return [dict(fdc_id=food.fdc_id, description=food.description,
+                 data_type=food.data_type, brand_name=food.brand_name,
+                 gtin_upc=getattr(food, "gtin_upc", None),
+                 previously_logged=food.fdc_id in logged) for food in ordered]
+
+
+def _previously_logged(user_id, fdc_ids):
+    if user_id is None or not fdc_ids:
+        return set()
+    rows = db.session.query(FoodLog.fdc_id).filter(
+        FoodLog.user_id == user_id, FoodLog.fdc_id.in_(fdc_ids)).distinct()
+    return {fdc_id for (fdc_id,) in rows}
 
 
 def search_exercises(query):
