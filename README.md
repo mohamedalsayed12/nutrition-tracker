@@ -1,10 +1,10 @@
 # Nutrition Tracker API
 
-This is the backend for a nutrition tracker I'm building. It lets people log food and activity, set goals, and understand how a day or week compares with those goals. I kept the API separate from the frontend so a web or mobile interface can use the same data and calculations.
+I'm building this nutrition tracker so people can log food and activity, set goals, and see how a day or week compares with those goals. I kept the backend separate so I can add a web or mobile app later without rebuilding the calculations.
 
-The app uses Flask for HTTP endpoints, PostgreSQL for records, and SQLAlchemy for database access. It has no HTML pages or browser session login yet; clients use JWT access tokens.
+The backend uses Flask, PostgreSQL, and SQLAlchemy. For now it's an API, with no frontend or browser login; clients sign in with JWT access tokens.
 
-## What works today
+## What I've built so far
 
 - Accounts, login, and user-specific food and activity logs.
 - Food lookup through USDA FoodData Central, with nutrients calculated on the server.
@@ -12,11 +12,11 @@ The app uses Flask for HTTP endpoints, PostgreSQL for records, and SQLAlchemy fo
 - Daily reports, weekly recaps, saved days, and frequently logged foods.
 - PostgreSQL migrations, Docker setup, OpenAPI documentation, and automated tests.
 
-Food search needs a USDA API key. Exercise search needs an API Ninjas key. The frontend and hosted deployment are still in progress.
+Food search needs a USDA API key, and exercise search needs an API Ninjas key. I'm still working on the frontend and hosted deployment.
 
-## Architecture
+## How I organised it
 
-The layout follows the social media FastAPI project's separation of responsibilities, using Flask Blueprints for routers.
+I split the routes, validation, calculations, and database work into separate parts so the API is easier to extend. I used the same general separation of responsibilities as my [Gym Social Media API](https://github.com/mohamedalsayed12/gym-social-media), with Flask Blueprints for the routes.
 
 | Module | Responsibility |
 | --- | --- |
@@ -35,11 +35,11 @@ The layout follows the social media FastAPI project's separation of responsibili
 | `tests/conftest.py` | Isolated application, database, and authentication fixtures. |
 | `.github/workflows/build-deploy.yml` | PostgreSQL tests, optional Docker publishing, and gated Vercel deployment. |
 
-The request flow is: router → Pydantic schema → service → SQLAlchemy model → PostgreSQL. JWT authentication checks that the token's user still exists. Resource queries always include the signed-in user's ID.
+A request moves from a route to a Pydantic schema, then a service, a SQLAlchemy model, and PostgreSQL. I check that the user in a JWT still exists, and I scope resource queries to the signed-in user.
 
-## Run locally
+## Run it locally
 
-From this project directory in PowerShell:
+From the project directory in PowerShell:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
@@ -48,9 +48,9 @@ docker compose up -d database
 .\.venv\Scripts\python.exe -m flask --app main run --debug --port 8000
 ```
 
-The database container exposes PostgreSQL on `127.0.0.1:5432` and persists its records in a named Docker volume. Add the settings from `.env.example` to your ignored local `.env`. `DATABASE_HOSTNAME` is `localhost` when Flask runs on Windows and `database` inside Compose. SQLAlchemy builds the connection URL from separate fields, including passwords containing special characters. `DATABASE_URL` may be supplied instead and takes precedence. PostgreSQL is required for the application and tests.
+Start with `.env.example` and put your local settings in an ignored `.env`. The database container exposes PostgreSQL on `127.0.0.1:5432` and keeps its data in a named Docker volume. Set `DATABASE_HOSTNAME` to `localhost` when Flask runs on Windows, or `database` when it runs in Compose. SQLAlchemy builds the connection URL from separate fields, including passwords with special characters. You can also supply `DATABASE_URL`, which takes precedence. The app and tests both need PostgreSQL.
 
-Use separate random values for `SECRET_KEY` and `JWT_SECRET_KEY`. `FDC_API_KEY` enables USDA food lookup and food logging. `API_NINJAS_KEY` enables exercise search. Set `FRONTEND_ORIGIN` to your future frontend's exact origin; multiple origins can be comma separated. Access tokens expire after `ACCESS_TOKEN_EXPIRE_MINUTES`, defaulting to 30.
+Use different random values for `SECRET_KEY` and `JWT_SECRET_KEY`. Add `FDC_API_KEY` for USDA food search and logging, and `API_NINJAS_KEY` for exercise search. Set `FRONTEND_ORIGIN` to the exact origin of a future frontend; you can separate multiple origins with commas. Access tokens expire after `ACCESS_TOKEN_EXPIRE_MINUTES`, which defaults to 30.
 
 To run both the API and PostgreSQL in containers:
 
@@ -60,9 +60,9 @@ docker compose up -d --build
 
 The API container applies migrations before starting Gunicorn on port 8000. `/api/v1/health` checks the application; `/api/v1/ready` checks the PostgreSQL connection.
 
-## API contract
+## Using the API
 
-`GET /openapi.json` returns the OpenAPI specification and request schemas for frontend development. All application routes return JSON, including errors.
+`GET /openapi.json` gives you the full request and response schema if you want to build a frontend. The application routes return JSON, including errors.
 
 | Method and path | Purpose |
 | --- | --- |
@@ -102,20 +102,20 @@ Nutrition setup uses:
 {"age": 30, "sex": "male", "height_cm": 175, "weight_kg": 75, "activity_level": "moderately active", "goal": "maintain"}
 ```
 
-The existing calculation rules and source-linked condition guidance are retained as backend services. Activity logging requires nutrition setup. Use `/openapi.json` for complete field constraints and allowed values.
+I kept the nutrition calculations and source-linked condition guidance in backend services. You need to finish nutrition setup before logging activity. Check `/openapi.json` for the exact field rules and allowed values.
 
-## Database migrations and existing records
+## Changing the database
 
-Schema changes run explicitly through migrations; starting Flask does not create or alter tables.
+I use migrations for schema changes. Starting Flask does not create or alter tables.
 
 ```powershell
 .\.venv\Scripts\python.exe -m flask --app main db migrate -m "Describe the schema change"
 .\.venv\Scripts\python.exe -m flask --app main db upgrade
 ```
 
-Review generated migrations before applying them. The initial revision supports the existing tracker schema, including its two historical health preference columns. The existing tracker records have been transferred to PostgreSQL. Food search and serving sizes use the USDA API and require `FDC_API_KEY`.
+Review a generated migration before applying it. The initial revision supports the existing tracker schema, including two historical health preference columns. I transferred the existing tracker records to PostgreSQL. Food search and serving sizes use the USDA API, so they need `FDC_API_KEY`.
 
-SQLAlchemy binds query values separately from SQL. User input is never interpolated into query strings.
+SQLAlchemy binds values separately from SQL, so I don't put user input directly into query strings.
 
 ## Tests and CI
 
@@ -123,15 +123,15 @@ SQLAlchemy binds query values separately from SQL. User input is never interpola
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Tests use a dedicated PostgreSQL database named `nutrition_test` by default, using the connection settings from `.env`. Create it once with `docker compose exec -T database createdb -U nutrition nutrition_test`. You can instead provide `TEST_DATABASE_URL` pointing to another dedicated database whose name ends in `_test`. Tests create and remove its application tables. Never use your application database as the test database. CI starts PostgreSQL 16, applies migrations, and runs the suite against its test database.
+The tests use a separate PostgreSQL database named `nutrition_test` by default, with connection settings from `.env`. Create it once with `docker compose exec -T database createdb -U nutrition nutrition_test`. You can use `TEST_DATABASE_URL` for a different dedicated database, as long as its name ends in `_test`. The tests create and remove tables, so don't point them at your application database. CI starts PostgreSQL 16, applies migrations, and runs the suite against its own test database.
 
 Docker publishing is optional: set the repository variable `PUBLISH_DOCKER_IMAGE=true` and production environment secrets `DOCKER_HUB_USERNAME` and `DOCKER_HUB_ACCESS_TOKEN`. Successful main branch builds then publish `<username>/nutrition-tracker:latest`.
 
-## Vercel deployment
+## Deployment setup
 
-Vercel runs the Flask `app` exported from `app.py` with Python 3.14. The deployment job runs after the PostgreSQL test job succeeds, applies Alembic migrations to the hosted database, and deploys the application. Vercel's automatic Git deployment is disabled in `vercel.json` so the GitHub Actions test gate controls production deployment.
+I've set up a gated Vercel deployment, although hosted deployment is still in progress. Vercel runs the Flask `app` from `app.py` with Python 3.14. After the PostgreSQL tests pass, the job applies Alembic migrations to the hosted database and deploys the app. I disabled Vercel's automatic Git deployment in `vercel.json` so GitHub Actions controls that sequence.
 
-Connect a hosted PostgreSQL database to the Vercel project for the production environment. The Neon integration provides `DATABASE_URL` to the project. The local Docker database at `127.0.0.1` is not reachable from Vercel or GitHub Actions. The deployment job reads the production database URL through Vercel CLI when it runs migrations, so the database must allow connections from GitHub Actions as well.
+For production, connect a hosted PostgreSQL database to the Vercel project. The Neon integration supplies `DATABASE_URL`. The local Docker database at `127.0.0.1` cannot be reached from Vercel or GitHub Actions. The deployment job reads the production URL through Vercel CLI when it applies migrations, so the hosted database also needs to accept connections from GitHub Actions.
 
 Create a GitHub Actions environment named `deployment` and add these environment secrets:
 
@@ -146,7 +146,7 @@ Create a GitHub Actions environment named `deployment` and add these environment
 | `API_NINJAS_KEY` | API Ninjas key for exercise search, if used. |
 | `FRONTEND_ORIGIN` | Allowed frontend origin for CORS, when a frontend is available. |
 
-The workflow passes application settings to Vercel as deployment environment variables. `DATABASE_URL` stays in the Vercel integration rather than being duplicated in GitHub secrets. Once the database is connected to the project and the secrets are ready, set the repository variable `ENABLE_VERCEL_DEPLOY=true`. Pushes to `main` then deploy after tests pass. The job is skipped until that variable is set.
+The workflow passes the app settings to Vercel as deployment environment variables. I keep `DATABASE_URL` in the Vercel integration instead of copying it into GitHub secrets. Once the database and secrets are ready, set the repository variable `ENABLE_VERCEL_DEPLOY=true`. Pushes to `main` will then deploy after tests pass. Until you set that variable, the deployment job stays off.
 
 The Vercel CLI also ignores `.env`, `instance/`, and tests through `.vercelignore`. Do not commit production credentials.
 
