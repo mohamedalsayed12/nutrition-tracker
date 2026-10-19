@@ -77,14 +77,14 @@ The API container applies migrations before starting Gunicorn on port 8000. `/ap
 | `GET`, `PUT /api/v1/goals/nutrition` | Read or calculate nutrition targets. |
 | `GET`, `PUT /api/v1/settings/health` | Read or replace health preferences and personal targets. |
 | `GET`, `PUT`, `DELETE /api/v1/settings/macro-split` | Read, replace, or reset macro percentages. |
-| `GET /api/v1/foods?q=...` | Search USDA foods, optionally personalized with a token. |
+| `GET /api/v1/foods?q=...` | Search USDA foods. With a token, foods you have logged before come first. |
 | `GET /api/v1/foods/{fdc_id}/measures` | Read serving size conversions. |
 | `GET /api/v1/foods/frequent` | Read your frequently logged foods. |
 | `GET /api/v1/exercises?q=...` | Search exercise names. |
 | `GET /api/v1/reports/daily` | Read daily totals, targets, and exercise credit. |
 | `GET /api/v1/reports/weekly` | Read a seven day nutrition recap. |
-| `PUT /api/v1/days/{YYYY-MM-DD}/save` | Save a logged UTC day. |
-| `GET /api/v1/days` | Read saved UTC days. |
+| `PUT /api/v1/days/{YYYY-MM-DD}/save?timezone=...` | Save a logged day in your timezone (an IANA name such as `Asia/Bahrain`; defaults to UTC). |
+| `GET /api/v1/days` | Read your saved days. |
 
 Protected routes require `Authorization: Bearer <access_token>`. Food and activity listings accept `page` and `per_page` (maximum 100). Daily reports accept `date=YYYY-MM-DD`; weekly reports accept `week_start=YYYY-MM-DD`. Reports accept an IANA `timezone`, such as `Europe/London`, and default to UTC. Saved days use UTC; changing or deleting food logs reopens their saved day.
 

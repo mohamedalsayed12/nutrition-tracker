@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, abort, jsonify, request
 from flask_jwt_extended import jwt_required
@@ -46,15 +46,24 @@ def frequent():
 @router.put("/days/<day>/save")
 @jwt_required()
 def save_day(day):
-    day = date.fromisoformat(day)
-    start, end = day_range(day, timezone.utc)
+    try:
+        day = date.fromisoformat(day)
+    except ValueError:
+        raise ValueError("Use an ISO date: YYYY-MM-DD.") from None
+    # Use the same timezone as the daily report, so a saved day covers
+    # exactly the food that report showed.
+    zone = report_timezone(request.args.get("timezone", "UTC"))
+    start, end = day_range(day, zone)
     user_id = current_user_id()
     if not db.session.query(FoodLog.id).filter(FoodLog.user_id == user_id, FoodLog.logged_at >= start, FoodLog.logged_at < end).first():
         abort(409, description="Log food before saving a day.")
-    if db.session.get(SavedEatingDay, (user_id, day)) is None:
-        db.session.add(SavedEatingDay(user_id=user_id, day=day))
-        db.session.commit()
-    return jsonify(date=day.isoformat(), saved=True)
+    saved = db.session.get(SavedEatingDay, (user_id, day))
+    if saved is None:
+        db.session.add(SavedEatingDay(user_id=user_id, day=day, timezone=str(zone)))
+    else:
+        saved.timezone = str(zone)
+    db.session.commit()
+    return jsonify(date=day.isoformat(), timezone=str(zone), saved=True)
 
 
 @router.get("/days")

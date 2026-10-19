@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from flask import abort
@@ -7,6 +7,7 @@ from usda_fdc import FdcResourceNotFoundError
 from database import db
 from models import (ActivityLog, ExerciseDetails, ExerciseTargetCredit, FoodLog,
                     HealthPreferences, NutritionTargets, SavedEatingDay, UserActivityBaseline)
+from services.dates import as_utc, day_range, report_timezone
 from services.calc import EXERCISE_METS, active_exercise_calories, estimate_exercise_calories, scaled_food_nutrients
 from services.food_search import get_food_client
 
@@ -27,10 +28,19 @@ def food_values(data):
 
 
 def invalidate_day(log):
-    day = log.logged_at.date()
-    saved = db.session.get(SavedEatingDay, (log.user_id, day))
-    if saved is not None:
-        db.session.delete(saved)
+    """Un-save any saved day that this food log falls inside.
+
+    Saved days are calendar days in the user's timezone, so check the
+    neighbouring UTC dates and compare against each day's real time range.
+    """
+    logged_at = as_utc(log.logged_at)
+    nearby = [logged_at.date() + timedelta(days=offset) for offset in (-1, 0, 1)]
+    saved_days = db.session.query(SavedEatingDay).filter(
+        SavedEatingDay.user_id == log.user_id, SavedEatingDay.day.in_(nearby)).all()
+    for saved in saved_days:
+        start, end = day_range(saved.day, report_timezone(saved.timezone))
+        if start <= logged_at < end:
+            db.session.delete(saved)
 
 
 def create_food(user_id, data):
