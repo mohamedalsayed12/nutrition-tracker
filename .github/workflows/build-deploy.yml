@@ -9,26 +9,34 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: nutrition_test
+          # App DB for migrations; tests use a separate *_test database.
+          POSTGRES_DB: nutrition
           POSTGRES_USER: nutrition
           POSTGRES_PASSWORD: test-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U nutrition -d nutrition_test"
+          --health-cmd "pg_isready -U nutrition -d nutrition"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
       SECRET_KEY: test-session-secret-with-32-chars-minimum
       JWT_SECRET_KEY: test-jwt-secret-with-32-chars-minimum
-      DATABASE_URL: postgresql+psycopg://nutrition:test-password@localhost:5432/nutrition_test
+      DATABASE_URL: postgresql+psycopg://nutrition:test-password@localhost:5432/nutrition
       TEST_DATABASE_URL: postgresql+psycopg://nutrition:test-password@localhost:5432/nutrition_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
+      - name: Create isolated test database
+        run: |
+          container=$(docker ps --filter publish=5432 --format '{{.ID}}' | head -n 1)
+          docker exec "$container" psql -U nutrition -d nutrition -v ON_ERROR_STOP=1 \
+            -c "SELECT 1 FROM pg_database WHERE datname = 'nutrition_test'" | grep -q 1 \
+            || docker exec "$container" psql -U nutrition -d nutrition -v ON_ERROR_STOP=1 \
+              -c "CREATE DATABASE nutrition_test;"
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m flask --app main db upgrade
