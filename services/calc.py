@@ -531,21 +531,23 @@ def frequent_food_choices(food_logs, per_meal=5):
     for log in food_logs:
         if log.meal not in choices:
             continue
-        duplicate_key = (log.meal, log.fdc_id, log.grams)
+        food_key = log.fdc_id if log.fdc_id is not None else f"barcode:{getattr(log, 'barcode', None)}"
+        duplicate_key = (log.meal, food_key, log.grams)
         previous = recent_duplicates.get(duplicate_key)
         recent_duplicates[duplicate_key] = log.logged_at
         if previous is not None and 0 <= (previous - log.logged_at).total_seconds() < 5:
             continue
         meal_choices = choices[log.meal]
-        if log.fdc_id not in meal_choices:
-            meal_choices[log.fdc_id] = {
+        if food_key not in meal_choices:
+            meal_choices[food_key] = {
                 "fdc_id": log.fdc_id,
+                "barcode": getattr(log, "barcode", None),
                 "description": log.food_name,
                 "grams": log.grams,
                 "count": 0,
                 "last_logged": log.logged_at,
             }
-        meal_choices[log.fdc_id]["count"] += 1
+        meal_choices[food_key]["count"] += 1
     return {
         meal: sorted(items.values(),
                      key=lambda item: (item["count"], item["last_logged"]),

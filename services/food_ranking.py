@@ -92,7 +92,7 @@ def _match_tier(description, query_words):
     return 1      # starts with the search but adds words, e.g. "Milk shake"
 
 
-def rank_key(food, query_words):
+def rank_key(food, query_words, raw_first=False):
     # Text in brackets is a USDA note, e.g. "(Includes foods for USDA's Food
     # Distribution Program)", not part of the food's name.
     description = re.sub(r"\([^)]*\)", "", food.description or "").strip()
@@ -103,9 +103,13 @@ def rank_key(food, query_words):
     processed += 1 if (food_words - asked) & MIXED_DISH else 0
     everyday = max((EVERYDAY.get(word, 0) for word in food_words - asked), default=0)
     extra_words = len(food_words - asked - FILLER)
+    # In the search box raw foods come first ("Rice, white, raw" before "Rice,
+    # cooked"); Siri keeps the everyday order, since "a cup of rice" means cooked.
+    raw_rank = 0 if (raw_first and "raw" in food_words - asked) else 1
     return (
         _match_tier(description, query_words),
         2 * unusual + processed,
+        raw_rank,
         -everyday,
         extra_words,
         DATA_TYPE_ORDER.get(food.data_type, 4),
@@ -117,13 +121,13 @@ def _same_food_key(food):
     return tuple(sorted(set(words(food.description)) - {"nfs", "ns"}))
 
 
-def rank_foods(foods, query):
+def rank_foods(foods, query, raw_first=True):
     """Matching foods, everyday generic foods first, then a few branded ones."""
     query_words = words(" ".join(query.split()))
     if not query_words:
         return []
     candidates = [food for food in foods if matches(food, query_words)]
-    candidates.sort(key=lambda food: rank_key(food, query_words))
+    candidates.sort(key=lambda food: rank_key(food, query_words, raw_first))
 
     generic, branded, seen = [], [], set()
     for food in candidates:

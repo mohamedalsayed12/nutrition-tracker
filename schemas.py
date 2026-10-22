@@ -37,9 +37,28 @@ class UserLogin(InputModel):
 
 
 class FoodLogCreate(InputModel):
+    """A USDA food by FDC id, or a packaged food by barcode (looked up on Open Food Facts)."""
     meal: Literal["breakfast", "lunch", "dinner", "snack"]
-    fdc_id: int = Field(gt=0, strict=True)
+    fdc_id: int | None = Field(default=None, gt=0, strict=True)
+    barcode: Annotated[str, StringConstraints(pattern=r"^\d{8,14}$")] | None = None
     grams: PositiveAmount
+
+    @model_validator(mode="after")
+    def one_food(self):
+        if (self.fdc_id is None) == (self.barcode is None):
+            raise ValueError("Send either fdc_id or barcode.")
+        return self
+
+
+class VoiceLogCreate(InputModel):
+    """What someone said to Siri, e.g. "two eggs and a banana for breakfast"."""
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=500)]
+    meal: Literal["breakfast", "lunch", "dinner", "snack"] | None = None
+
+
+class ApiTokenCreate(InputModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)] = "Siri"
+    timezone: Annotated[str, StringConstraints(max_length=64)] = "UTC"
 
 
 class ActivityLogCreate(InputModel):

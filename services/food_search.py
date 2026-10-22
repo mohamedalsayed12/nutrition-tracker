@@ -42,7 +42,29 @@ def get_food_client():
 GENERIC_TYPES = ["Foundation", "SR Legacy", "Survey (FNDDS)"]
 
 
-def _find_foods(client, query):
+# Everyday and British words -> the words USDA uses in its names.
+SYNONYMS = {
+    "toast": "bread toasted", "toasts": "bread toasted",
+    "crisps": "potato chips", "crisp": "potato chips",
+    "chips": "french fries", "chip": "french fries",
+    "biscuit": "cookies", "biscuits": "cookies",
+    "porridge": "oatmeal cooked", "mince": "ground beef", "minced beef": "ground beef",
+    "prawn": "shrimp", "prawns": "shrimp", "courgette": "zucchini", "courgettes": "zucchini",
+    "aubergine": "eggplant", "aubergines": "eggplant", "coriander": "cilantro",
+    "coke": "cola", "fizzy drink": "soft drink", "yoghurt": "yogurt", "yoghurts": "yogurt",
+    "jam": "jams and preserves", "rocket": "arugula", "spring onion": "scallions",
+    "spring onions": "scallions", "jacket potato": "potato baked", "beetroot": "beets",
+    "swede": "rutabaga", "mangetout": "snow peas", "single cream": "cream light",
+    "double cream": "cream heavy", "icing sugar": "sugar powdered", "cornflour": "cornstarch",
+}
+
+
+def with_synonyms(query):
+    return SYNONYMS.get(query.strip().lower(), query)
+
+
+def _find_foods(client, query, raw_first=True):
+    query = with_synonyms(query)
     fdc_match = re.fullmatch(r"fdc\s*[:#]?\s*(\d+)", query, re.IGNORECASE)
     if fdc_match or re.fullmatch(r"\d{2,7}", query):
         try:
@@ -63,7 +85,7 @@ def _find_foods(client, query):
     except Exception:
         logger.warning("Filtered USDA search failed; using an unfiltered search", exc_info=True)
         generic, branded = list(client.search(query, page_size=100).foods), []
-    ranked = rank_foods(generic + branded, query)
+    ranked = rank_foods(generic + branded, query, raw_first)
     query_words = words(query)
     if len(query_words) > 1 and sum(food.data_type != "Branded" for food in ranked) < 5:
         # A multi-word search can miss foods USDA indexes differently, so widen
@@ -72,7 +94,7 @@ def _find_foods(client, query):
             broader = list(client.search(query_words[0], data_type=GENERIC_TYPES, page_size=100).foods)
         except Exception:
             broader = list(client.search(query_words[0], page_size=100).foods)
-        ranked = rank_foods(generic + broader + branded, query)
+        ranked = rank_foods(generic + broader + branded, query, raw_first)
     return ranked
 
 

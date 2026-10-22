@@ -1,4 +1,4 @@
-import type { ExerciseSearchResponse, FoodMeasuresResponse, FoodScore, FoodSearchResponse, FrequentFoodsResponse } from "../types/api.ts"
+import type { BarcodeResponse, ExerciseSearchResponse, FoodMeasuresResponse, FoodScore, FoodSearchResponse, FrequentFoodsResponse } from "../types/api.ts"
 import { request } from "./client.ts"
 import { mockFoodScore } from "./mock/score.ts"
 
@@ -8,6 +8,10 @@ export function searchFoods(query: string): Promise<FoodSearchResponse> {
 
 export function getMeasures(fdcId: number): Promise<FoodMeasuresResponse> {
   return request<FoodMeasuresResponse>(`/foods/${fdcId}/measures`)
+}
+
+export function lookupBarcode(code: string): Promise<BarcodeResponse> {
+  return request<BarcodeResponse>(`/foods/barcode/${encodeURIComponent(code)}`)
 }
 
 export function getFrequentFoods(): Promise<FrequentFoodsResponse> {

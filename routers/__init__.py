@@ -1,7 +1,7 @@
 
 def register_routes(app):
     import auth
-    from routers import activity_logs, food_logs, foods, goals, health, reports, settings, users
+    from routers import activity_logs, food_logs, foods, goals, health, reports, settings, users, voice
 
     for router, prefix in (
         (auth.router, "/api/v1/auth"),
@@ -12,6 +12,7 @@ def register_routes(app):
         (settings.router, "/api/v1/settings"),
         (foods.router, "/api/v1"),
         (reports.router, "/api/v1"),
+        (voice.router, "/api/v1"),
         (health.router, ""),
     ):
         app.register_blueprint(router, url_prefix=prefix)

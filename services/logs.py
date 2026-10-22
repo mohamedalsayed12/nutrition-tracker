@@ -8,22 +8,45 @@ from database import db
 from models import (ActivityLog, ExerciseDetails, ExerciseTargetCredit, FoodLog,
                     HealthPreferences, NutritionTargets, SavedEatingDay, UserActivityBaseline)
 from services.calc import EXERCISE_METS, active_exercise_calories, estimate_exercise_calories, scaled_food_nutrients
+from services.barcode import fetch_open_food_facts
 from services.food_search import get_food_client
 
 
 def food_values(data):
+    food = barcode_food(data.barcode) if getattr(data, "barcode", None) else usda_food(data.fdc_id)
+    return dict(meal=data.meal, fdc_id=getattr(data, "fdc_id", None), barcode=getattr(data, "barcode", None),
+                food_name=_display_name(food), grams=data.grams,
+                nutrients=scaled_food_nutrients(food, Decimal(str(data.grams))))
+
+
+def usda_food(fdc_id):
     try:
         client = get_food_client()
     except ValueError as error:
         abort(503, description=str(error))
     try:
-        food = client.get_food(data.fdc_id)
+        return client.get_food(fdc_id)
     except FdcResourceNotFoundError:
         abort(404, description="USDA food not found.")
     except Exception:
         abort(502, description="Food details are temporarily unavailable.")
-    return dict(meal=data.meal, fdc_id=data.fdc_id, food_name=food.description,
-                grams=data.grams, nutrients=scaled_food_nutrients(food, Decimal(str(data.grams))))
+
+
+def barcode_food(code):
+    try:
+        food = fetch_open_food_facts(code)
+    except LookupError as error:
+        abort(502, description=str(error))
+    if food is None:
+        abort(404, description="No nutrition data was found for this barcode.")
+    return food
+
+
+def _display_name(food):
+    brand = getattr(food, "brand_name", None)
+    if getattr(food, "barcode", None) and brand and brand.lower() not in food.description.lower():
+        return f"{food.description} ({brand})"[:300]
+    return food.description[:300]
 
 
 def invalidate_day(log):
@@ -87,7 +110,7 @@ def update_activity(log, data):
 
 
 def serialize_food(log):
-    return dict(id=log.id, meal=log.meal, fdc_id=log.fdc_id, food_name=log.food_name,
+    return dict(id=log.id, meal=log.meal, fdc_id=log.fdc_id, barcode=log.barcode, food_name=log.food_name,
                 grams=log.grams, nutrients=log.nutrients, logged_at=iso_utc(log.logged_at))
 
 

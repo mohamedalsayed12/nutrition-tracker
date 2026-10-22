@@ -153,6 +153,24 @@ Heroku serves the React app in `frontend/` at the site root, and the API under `
 the same address. The deploy job builds the React app and ships `frontend/dist` with the release;
 `routers/spa.py` serves it. The original server-rendered pages are still available under `/classic`.
 
+## Barcode scanning
+
+On the Foods screen, **Scan** opens the back camera and reads supermarket barcodes (EAN-13, EAN-8,
+UPC) with ZXing; the number can also be typed. `GET /api/v1/foods/barcode/<code>` checks USDA
+Branded Foods first and falls back to [Open Food Facts](https://world.openfoodfacts.org), which
+covers UK and European products. Open Food Facts products are converted to USDA names and units
+(`services/barcode.py`), so servings, totals and targets work the same, and are logged by barcode.
+
+## Log food with Siri
+
+`POST /api/v1/voice-log` takes what was said (`{"text": "two eggs and a slice of toast for
+breakfast"}`) with a personal key created in Settings (`Authorization: Bearer h4e_...`; only a
+SHA-256 hash is stored, and the key can only log food). `services/voice_parser.py` reads the meal,
+amounts and units; `services/voice_log.py` matches each food to USDA (preferring foods you have
+logged before, and cooked forms of foods that are usually cooked), converts the amount with USDA's
+own serving sizes, logs it, and returns a sentence for Siri with the calories left today. Settings
+shows how to build the iPhone Shortcut (Dictate Text -> Get Contents of URL -> Speak Text).
+
 ## Using it on a phone
 
 The site is a Progressive Web App, so it can be installed from the browser:

@@ -279,7 +279,7 @@
       <label>Breakfast <input name="breakfast" data-food-search autocomplete="off" placeholder="Search name, FDC ID, or barcode"></label>
       {% if frequent_foods.breakfast %}
         <div class="quick-foods"><p>Frequently logged · select, adjust, then Save</p>
-          {% for food in frequent_foods.breakfast %}
+          {% for food in frequent_foods.breakfast if food.fdc_id %}{# classic pages log USDA foods only #}
             <button type="button" data-quick-food data-fdc-id="{{ food.fdc_id }}" data-description="{{ food.description }}" data-grams="{{ food.grams }}">{{ food.description }} · {{ food.grams|round(1) }} g</button>
           {% endfor %}
         </div>
@@ -295,7 +295,7 @@
       <label>Lunch <input name="lunch" data-food-search autocomplete="off" placeholder="Search foods"></label>
       {% if frequent_foods.lunch %}
         <div class="quick-foods"><p>Frequently logged · select, adjust, then Save</p>
-          {% for food in frequent_foods.lunch %}
+          {% for food in frequent_foods.lunch if food.fdc_id %}{# classic pages log USDA foods only #}
             <button type="button" data-quick-food data-fdc-id="{{ food.fdc_id }}" data-description="{{ food.description }}" data-grams="{{ food.grams }}">{{ food.description }} · {{ food.grams|round(1) }} g</button>
           {% endfor %}
         </div>
@@ -311,7 +311,7 @@
       <label>Dinner <input name="dinner" data-food-search autocomplete="off" placeholder="Search foods"></label>
       {% if frequent_foods.dinner %}
         <div class="quick-foods"><p>Frequently logged · select, adjust, then Save</p>
-          {% for food in frequent_foods.dinner %}
+          {% for food in frequent_foods.dinner if food.fdc_id %}{# classic pages log USDA foods only #}
             <button type="button" data-quick-food data-fdc-id="{{ food.fdc_id }}" data-description="{{ food.description }}" data-grams="{{ food.grams }}">{{ food.description }} · {{ food.grams|round(1) }} g</button>
           {% endfor %}
         </div>

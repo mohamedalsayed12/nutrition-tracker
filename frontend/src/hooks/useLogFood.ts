@@ -11,14 +11,18 @@ export function useLogFood() {
   const toast = useToast()
 
   return useMutation({
-    mutationFn: (input: LogInput) => createFoodLog({ meal: input.meal, fdc_id: input.fdc_id, grams: input.grams }),
+    mutationFn: (input: LogInput) => createFoodLog(
+      input.barcode ? { meal: input.meal, barcode: input.barcode, grams: input.grams }
+        : { meal: input.meal, fdc_id: input.fdc_id, grams: input.grams },
+    ),
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: ["food-logs"] })
       const previous = queryClient.getQueryData<FoodLog[]>(["food-logs", "recent"])
       const temp: FoodLog = {
         id: -Date.now(),
         meal: input.meal,
-        fdc_id: input.fdc_id,
+        fdc_id: input.fdc_id ?? null,
+        barcode: input.barcode ?? null,
         food_name: input.food_name,
         grams: input.grams,
         nutrients: [],

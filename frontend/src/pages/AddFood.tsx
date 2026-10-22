@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
-import { useEffect, useRef, useState } from "react"
+import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import { Navigate, useSearchParams } from "react-router-dom"
 import { ApiError } from "../api/client.ts"
-import { getFrequentFoods, getMeasures, searchFoods } from "../api/foods.ts"
+import { getFrequentFoods, getMeasures, lookupBarcode, searchFoods } from "../api/foods.ts"
 import { Button } from "../components/ui/Button.tsx"
 import { Card } from "../components/ui/Card.tsx"
 import { Input } from "../components/ui/Input.tsx"
@@ -15,6 +15,12 @@ import { mealOptions } from "../lib/meals.ts"
 import { gramsFromServing } from "../lib/servings.ts"
 import type { FoodMeasure, FoodSummary, Meal } from "../types/api.ts"
 
+// The camera code is only downloaded when someone taps "Scan barcode".
+const BarcodeScanner = lazy(() => import("../components/food/BarcodeScanner.tsx"))
+
+/** A food picked from search, or found by barcode (which arrives with its servings). */
+type Selected = FoodSummary & { measures?: FoodMeasure[]; source?: string }
+
 export function AddFoodPage() {
   const nutrition = useNutrition()
   const [params] = useSearchParams()
@@ -23,7 +29,10 @@ export function AddFoodPage() {
   const [finder, setFinder] = useState<"search" | "again">("search")
   const [query, setQuery] = useState("")
   const [debounced, setDebounced] = useState("")
-  const [selected, setSelected] = useState<FoodSummary | null>(null)
+  const [selected, setSelected] = useState<Selected | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [scanError, setScanError] = useState("")
+  const [lookingUp, setLookingUp] = useState(false)
   const logFood = useLogFood()
 
   useEffect(() => {
@@ -43,6 +52,21 @@ export function AddFoodPage() {
 
   const frequentMeals = frequent.data?.foods[meal] ?? []
 
+  async function onBarcode(code: string) {
+    setScanning(false)
+    setScanError("")
+    setLookingUp(true)
+    try {
+      const found = await lookupBarcode(code)
+      setFinder("search")
+      setSelected({ ...found.food, measures: found.measures })
+    } catch (error) {
+      setScanError(error instanceof ApiError ? error.message : "That barcode could not be looked up.")
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="font-display text-3xl font-medium">Foods</h1>
@@ -50,8 +74,22 @@ export function AddFoodPage() {
       <Tabs label="How to add a food" value={finder} onChange={(value) => setFinder(value as "search" | "again")} tabs={[{ id: "search", label: "Search" }, { id: "again", label: "Log again" }]} />
       {finder === "search" ? (
         <Card>
-          <Input label="Search foods" value={query} onChange={(event) => { setQuery(event.target.value); setSelected(null) }} placeholder="Chicken, banana, or an FDC id" />
+          <div className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <Input label="Search foods" value={query} onChange={(event) => { setQuery(event.target.value); setSelected(null) }} placeholder="Food or barcode" />
+            </div>
+            <Button variant="secondary" className="shrink-0" aria-label="Scan a barcode" onClick={() => { setScanError(""); setScanning(true) }}>
+              <BarcodeIcon /> <span className="ml-1.5">Scan</span>
+            </Button>
+          </div>
+          {lookingUp ? <p className="mt-3 text-sm text-muted">Looking up barcode…</p> : null}
+          {scanError ? <p className="mt-3 text-sm text-danger" role="alert">{scanError}</p> : null}
           {debounced.length > 0 && debounced.length < 2 ? <p className="mt-3 text-sm text-muted">Type at least 2 characters.</p> : null}
+          {/^\d{8,14}$/.test(debounced) ? (
+            <Button variant="secondary" size="sm" className="mt-3" onClick={() => void onBarcode(debounced)}>
+              Look up barcode {debounced}
+            </Button>
+          ) : null}
           {search.isLoading ? <Skeleton className="mt-4 h-20 w-full" /> : null}
           {search.isError ? (
             <p className="mt-3 text-sm text-danger">{search.error instanceof ApiError ? search.error.message : "Food search failed."}</p>
@@ -59,7 +97,7 @@ export function AddFoodPage() {
           {search.data && search.data.foods.length === 0 ? <p className="mt-3 text-sm text-muted">No foods matched that search.</p> : null}
           <ul className="mt-3 space-y-2">
             {search.data?.foods.map((food) => (
-              <li key={food.fdc_id}>
+              <li key={food.fdc_id ?? food.barcode ?? food.description}>
                 <button
                   type="button"
                   className="w-full rounded-2xl border border-line px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -85,7 +123,7 @@ export function AddFoodPage() {
           ) : (
             <ul className="mt-3 space-y-2">
               {frequentMeals.map((food) => (
-                <li key={`${food.fdc_id}-${food.grams}`} className="flex items-center justify-between gap-3">
+                <li key={`${food.fdc_id ?? food.barcode}-${food.grams}`} className="flex items-center justify-between gap-3">
                   <span>
                     <span className="block font-semibold">{food.description}</span>
                     <span className="text-sm text-muted">{food.grams} g · logged {food.count} times</span>
@@ -93,7 +131,7 @@ export function AddFoodPage() {
                   <Button
                     size="sm"
                     disabled={logFood.isPending}
-                    onClick={() => logFood.mutate({ meal, fdc_id: food.fdc_id, grams: food.grams, food_name: food.description })}
+                    onClick={() => logFood.mutate({ meal, fdc_id: food.fdc_id, barcode: food.barcode, grams: food.grams, food_name: food.description })}
                   >
                     Log
                   </Button>
@@ -105,13 +143,21 @@ export function AddFoodPage() {
       )}
       {finder === "search" && selected ? (
         <ServingSheet
-          key={selected.fdc_id}
+          key={selected.fdc_id ?? selected.barcode ?? selected.description}
           food={selected}
           meal={meal}
           pending={logFood.isPending}
           onClose={() => setSelected(null)}
-          onLog={(grams) => logFood.mutate({ meal, fdc_id: selected.fdc_id, grams, food_name: selected.description }, { onSuccess: () => setSelected(null) })}
+          onLog={(grams) => logFood.mutate(
+            { meal, fdc_id: selected.fdc_id, barcode: selected.fdc_id == null ? selected.barcode : null, grams, food_name: selected.description },
+            { onSuccess: () => setSelected(null) },
+          )}
         />
+      ) : null}
+      {scanning ? (
+        <Suspense fallback={null}>
+          <BarcodeScanner onDetected={(code) => void onBarcode(code)} onClose={() => setScanning(false)} />
+        </Suspense>
       ) : null}
     </div>
   )
@@ -127,13 +173,18 @@ function ServingSheet({
   onClose,
   onLog,
 }: {
-  food: FoodSummary
+  food: Selected
   meal: Meal
   pending: boolean
   onClose: () => void
   onLog: (grams: number) => void
 }) {
-  const measures = useQuery({ queryKey: ["foods", "measures", food.fdc_id], queryFn: () => getMeasures(food.fdc_id) })
+  const fetched = useQuery({
+    queryKey: ["foods", "measures", food.fdc_id],
+    queryFn: () => getMeasures(food.fdc_id as number),
+    enabled: food.measures == null && food.fdc_id != null,
+  })
+  const measures = food.measures ? { data: { measures: food.measures }, isLoading: false, isError: false, error: null } : fetched
   const [measureCode, setMeasureCode] = useState("")
   const [quantity, setQuantity] = useState("1")
   const panel = useRef<HTMLDivElement>(null)
@@ -180,7 +231,9 @@ function ServingSheet({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 id="serving-title" className="font-display text-xl font-medium">{food.description}</h2>
-            <p className="mt-0.5 text-sm text-muted">Add to {mealLabel}</p>
+            <p className="mt-0.5 text-sm text-muted">
+              {food.brand_name ? `${food.brand_name} · ` : ""}{food.source ? `${food.source} · ` : ""}Add to {mealLabel}
+            </p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
         </div>
@@ -212,5 +265,13 @@ function ServingSheet({
         ) : null}
       </div>
     </div>
+  )
+}
+
+function BarcodeIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" className="h-5 w-5">
+      <path d="M3 5v10M6 5v10M8.5 5v10M12 5v10M14 5v10M17 5v10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   )
 }

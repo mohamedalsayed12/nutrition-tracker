@@ -8,6 +8,7 @@ import { getCalories, saveCalories, saveNutrition } from "../api/goals.ts"
 import { getHealthSettings, getMacroSplit, resetMacroSplit, saveHealthSettings, saveMacroSplit } from "../api/settings.ts"
 import { NutritionFields } from "../components/nutrition/NutritionFields.tsx"
 import { GoalResults } from "../components/nutrition/GoalResults.tsx"
+import { SiriCard } from "../components/SiriCard.tsx"
 import { ThemeToggle } from "../components/ThemeToggle.tsx"
 import { Button } from "../components/ui/Button.tsx"
 import { Card } from "../components/ui/Card.tsx"
@@ -129,6 +130,7 @@ export function SettingsPage() {
       <CalorieCard key={calories.data.calories ?? "none"} calories={calories.data.calories} />
       <MacroCard key={`${macros.data.carbs_percent}-${macros.data.protein_percent}-${macros.data.fat_percent}-${macros.data.configured}`} initial={normalizeMacroSplit(macros.data)} configured={nutrition.data.configured} />
       <HealthCard key={JSON.stringify(health.data)} settings={health.data} configured={nutrition.data.configured} />
+      <SiriCard />
     </div>
   )
 }

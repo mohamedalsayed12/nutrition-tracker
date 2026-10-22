@@ -139,7 +139,9 @@ export type HealthSettings = {
 export type HealthSettingsRequest = Omit<HealthSettings, "guidance">
 
 export type FoodSummary = {
-  fdc_id: number
+  /** USDA id; null for a packaged food found only on Open Food Facts (then barcode is set). */
+  fdc_id: number | null
+  barcode?: string | null
   description: string
   data_type: string
   brand_name: string | null
@@ -165,7 +167,8 @@ export type FoodMeasuresResponse = {
 }
 
 export type FrequentFood = {
-  fdc_id: number
+  fdc_id: number | null
+  barcode?: string | null
   description: string
   grams: number
   count: number
@@ -186,7 +189,8 @@ export type FoodNutrient = {
 export type FoodLog = {
   id: number
   meal: Meal
-  fdc_id: number
+  fdc_id: number | null
+  barcode?: string | null
   food_name: string
   grams: number
   nutrients: FoodNutrient[]
@@ -195,8 +199,29 @@ export type FoodLog = {
 
 export type FoodLogRequest = {
   meal: Meal
-  fdc_id: number
+  fdc_id?: number | null
+  barcode?: string | null
   grams: number
+}
+
+export type BarcodeFood = FoodSummary & { source: "USDA" | "Open Food Facts"; kcal_per_100g: number | null }
+
+export type BarcodeResponse = {
+  food: BarcodeFood
+  measures: FoodMeasure[]
+}
+
+export type ApiToken = {
+  id: number
+  name: string
+  timezone: string
+  created_at: string
+  last_used_at: string | null
+}
+
+export type NewApiToken = ApiToken & {
+  /** Shown once; only a hash is stored. */
+  key: string
 }
 
 export type Page<T> = {
