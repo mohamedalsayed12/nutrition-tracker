@@ -96,6 +96,9 @@ def rank_key(food, query_words, raw_first=False):
     # Text in brackets is a USDA note, e.g. "(Includes foods for USDA's Food
     # Distribution Program)", not part of the food's name.
     description = re.sub(r"\([^)]*\)", "", food.description or "").strip()
+    # "Chicken breast, baked, ..., from raw" says how USDA sampled a cooked food;
+    # it is not a raw food.
+    description = re.sub(r",?\s*from (?:raw|pre-cooked|frozen|fresh|canned|dry|dried)\b", "", description, flags=re.IGNORECASE)
     food_words = set(words(description))
     asked = set(query_words)
     unusual = sum(1 for word in food_words - asked if word in UNUSUAL)

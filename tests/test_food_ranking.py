@@ -167,3 +167,10 @@ def test_white_rice_before_other_raw_rices():
     foods = [food(61, "Rice, black, unenriched, raw"), food(62, "Rice, white, medium-grain, raw, enriched"),
              food(63, "Rice, brown, long-grain, raw"), food(64, "Rice, cooked, NFS", "Survey (FNDDS)")]
     assert ids(rank_foods(foods, "rice"))[0] == 62
+
+
+def test_from_raw_on_a_cooked_food_does_not_count_as_raw():
+    foods = [food(41, "Chicken breast, baked, broiled, or roasted, skin eaten, from raw", "Survey (FNDDS)"),
+             food(42, "Chicken, breast, boneless, skinless, raw", "Foundation"),
+             food(43, "Chicken breast, rotisserie, skin eaten", "Survey (FNDDS)")]
+    assert ids(rank_foods(foods, "chicken breast"))[0] == 42

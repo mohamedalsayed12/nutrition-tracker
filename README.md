@@ -138,7 +138,7 @@ Each Heroku release applies the Alembic migrations in `migrations/` before Gunic
 
 ```text
 release: python -m flask --app main db upgrade
-web: gunicorn --bind 0.0.0.0:$PORT "main:create_app()"
+web: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 "main:create_app()"
 ```
 
 GitHub Actions runs on every push and pull request. The `build` job starts PostgreSQL 16, runs `flask db upgrade`, then pytest. A push to `main` that passes those tests deploys by pushing to Heroku. That job uses the `production` environment secret `HEROKU_API_KEY`. Heroku config vars, separate from the local `.env`, are `SECRET_KEY`, `JWT_SECRET_KEY`, `FDC_API_KEY`, `API_NINJAS_KEY`, and `FRONTEND_ORIGIN`. The addon owns `DATABASE_URL`.
