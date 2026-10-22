@@ -1,5 +1,40 @@
 <!doctype html>
-<title>{% block title %}{% endblock %} - Nutrient Tracker </title>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}{% endblock %} - Nutrient Tracker</title>
+  {% include "_app_head.html" %}
+  <style>
+    /* Phone-friendly defaults shared by every page. */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { overflow-x: hidden; padding-bottom: env(safe-area-inset-bottom); }
+    img, svg, video { max-width: 100%; height: auto; }
+
+    nav { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          flex-wrap: wrap; padding-top: max(12px, env(safe-area-inset-top)) !important; }
+    nav h1 { font-size: 1.4rem; margin: 0; }
+    nav ul { display: flex; gap: 14px; list-style: none; margin: 0; padding: 0; }
+    nav a { color: #ffcc70 !important; }
+
+    /* Tables scroll sideways inside their card instead of squeezing the page. */
+    .content table { display: block; max-width: 100%; overflow-x: auto;
+                     -webkit-overflow-scrolling: touch; border-collapse: collapse; }
+
+    @media (max-width: 600px) {
+      .content h1 { font-size: 1.5rem; }
+      .content form, .content > p { padding: 16px !important; }
+      /* 16px stops iPhones zooming in when a field is tapped. */
+      .content input, .content select, .content textarea, .content button { font-size: 16px !important; }
+      .content input, .content select, .content button, .content a.action-button,
+      .target-actions a { min-height: 44px; }
+      .content table { font-size: 14px; }
+      .content th, .content td { white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
 <nav>
   <h1>Nutrient Tracker</h1>
   <ul>
@@ -7,9 +42,9 @@
       <li><span>{{ current_user.username }}</span></li>
     {% else %}
       {% if request.endpoint != 'home_page' %}
-  <li><a href="{{ url_for('auth.registration_page') }}">Register</a></li>
-  <li><a href="{{ url_for('auth.login_page') }}">Log In</a></li>
-{% endif %}
+        <li><a href="{{ url_for('auth.registration_page') }}">Register</a></li>
+        <li><a href="{{ url_for('auth.login_page') }}">Log In</a></li>
+      {% endif %}
     {% endif %}
   </ul>
 </nav>
@@ -22,3 +57,5 @@
   {% endfor %}
   {% block content %}{% endblock %}
 </section>
+</body>
+</html>

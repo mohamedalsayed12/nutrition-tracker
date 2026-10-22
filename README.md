@@ -23,7 +23,7 @@ I split the routes, validation, calculations, and database work into separate pa
 | Module | Responsibility |
 | --- | --- |
 | `main.py` | Application factory and extension initialization. |
-| `app.py` | WSGI entry point for Vercel and a factory import for Flask tools. |
+| `app.py` | WSGI entry point and a factory import for Flask tools. |
 | `config.py` | Environment settings and PostgreSQL connection URL. |
 | `database.py` | SQLAlchemy ORM, database initialization, and Flask-Migrate. |
 | `models.py` | Persistent user and nutrition models. |
@@ -35,7 +35,7 @@ I split the routes, validation, calculations, and database work into separate pa
 | `services/` | Nutrition calculations, external integrations, and application operations. |
 | `migrations/` | Versioned Alembic migrations through Flask-Migrate. |
 | `tests/conftest.py` | Isolated application, database, and authentication fixtures. |
-| `.github/workflows/build-deploy.yml` | PostgreSQL tests, Alembic upgrade, Heroku deploy, optional Docker publishing, and gated Vercel deployment. |
+| `.github/workflows/build-deploy.yml` | PostgreSQL tests, Alembic upgrade, Heroku deploy, and optional Docker publishing. |
 
 A request moves from a route to a Pydantic schema, then a service, a SQLAlchemy model, and PostgreSQL. I check that the user in a JWT still exists, and I scope resource queries to the signed-in user.
 
@@ -144,7 +144,18 @@ GitHub Actions runs on every push and pull request. The `build` job starts Postg
 
 `/api/v1/health` checks the process. `/api/v1/ready` checks PostgreSQL.
 
-The workflow also still deploys to Vercel on `main` after the same tests. Do not commit production credentials.
+Do not commit production credentials.
+
+## Using it on a phone
+
+The site is a Progressive Web App, so it can be installed from the browser:
+
+- **iPhone (Safari):** open the site, tap Share, then **Add to Home Screen**.
+- **Android (Chrome):** open the site, tap the menu, then **Install app** (or **Add to Home screen**).
+
+It then opens full screen from its own icon. `routers/pwa.py` serves the manifest, icons and
+`pwa/sw.js`. The service worker keeps only the icons and an offline page on the phone; pages and
+the API always come from the network, so logged data is never out of date.
 
 ## Framework references
 
