@@ -144,6 +144,8 @@ export type FoodSummary = {
   data_type: string
   brand_name: string | null
   gtin_upc: string | null
+  /** True when the signed-in user has logged this food before; these come first. */
+  previously_logged?: boolean
 }
 
 export type FoodSearchResponse = {
@@ -154,6 +156,8 @@ export type FoodMeasure = {
   code: string
   label: string
   grams: number
+  /** The serving to pre-select, e.g. "1 medium" (household portions come first). */
+  default?: boolean
 }
 
 export type FoodMeasuresResponse = {

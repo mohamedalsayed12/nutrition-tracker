@@ -17,7 +17,7 @@ def test_food_search_uses_usda_client(client, monkeypatch):
         def get_food(self, fdc_id):
             return next(food for food in foods if food.fdc_id == fdc_id)
 
-        def search(self, query, page_size):
+        def search(self, query, page_size, data_type=None):
             return SimpleNamespace(foods=foods)
 
     monkeypatch.setenv("FDC_API_KEY", "test-key")

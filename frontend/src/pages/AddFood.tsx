@@ -67,7 +67,10 @@ export function AddFoodPage() {
                   onClick={() => setSelected(food)}
                 >
                   <span className="block font-semibold">{food.description}</span>
-                  <span className="text-sm text-muted">{food.brand_name ? `${food.brand_name} · ` : ""}{food.data_type} · FDC {food.fdc_id}</span>
+                  <span className="text-sm text-muted">
+                    {food.previously_logged ? <span className="font-semibold text-accent">Logged before · </span> : null}
+                    {food.brand_name ? `${food.brand_name} · ` : ""}{food.data_type === "Branded" ? "Branded" : "USDA"}
+                  </span>
                 </button>
               </li>
             ))}
@@ -128,7 +131,7 @@ function ServingForm({
   const measures = useQuery({ queryKey: ["foods", "measures", food.fdc_id], queryFn: () => getMeasures(food.fdc_id) })
   const [measureCode, setMeasureCode] = useState("")
   const [quantity, setQuantity] = useState("1")
-  const preferred = measures.data?.measures.find((item) => item.grams === 100) ?? measures.data?.measures[0]
+  const preferred = measures.data?.measures.find((item) => item.default) ?? measures.data?.measures[0]
   const chosen = measures.data?.measures.find((item) => item.code === measureCode) ?? preferred
   const parsedQuantity = Number(quantity)
   let grams: number | null = null

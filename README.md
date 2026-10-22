@@ -8,6 +8,7 @@ The backend uses Flask, PostgreSQL, and SQLAlchemy. It has server-rendered pages
 
 - Accounts, login, and user-specific food and activity logs.
 - Food lookup through USDA FoodData Central, with nutrients calculated on the server.
+- Food search ranked like Cronometer: everyday generic foods first ("Milk, whole" before "Coconut milk"), processed variants lower, branded products after, and foods you have logged before at the top. Servings list household portions first and pre-select one, such as "1 medium".
 - Calorie and nutrient targets, macro split settings, and health preferences.
 - Daily reports, weekly recaps, saved days, and frequently logged foods.
 - A per-meal iron check: vitamin C only helps iron absorption when it is eaten in the same meal, so the daily report flags meals with iron but little vitamin C and suggests what to add (shown more prominently when periods are selected).

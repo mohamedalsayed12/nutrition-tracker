@@ -231,61 +231,83 @@ def _portion_volume_ml(description, amount=1):
     return key, quantity * _VOLUME_ML[key]
 
 
+# Portion words that describe a cut or prepared shape. A volume measured this way
+# ("1 cup, sliced") cannot be turned into tablespoons or millilitres sensibly.
+_CUT_WORDS = re.compile(r"slice|chop|dice|cube|piece|half|halves|quarter|shred|grate|mash|"
+                        r"floret|strip|wedge|ring|spear|stalk|packed|crumble|whole", re.IGNORECASE)
+_PLACEHOLDER_UNITS = {"undetermined", "unit", "units", ""}
+
+
+def _portion_label(portion):
+    if portion.portion_description and not portion.portion_description.lower().startswith("quantity not specified"):
+        return portion.portion_description
+    unit = (portion.measure_unit or "").strip()
+    if unit.lower() in _PLACEHOLDER_UNITS:
+        unit = ""
+    amount = f"{float(portion.amount):g}" if portion.amount else "1"
+    return " ".join(part for part in (amount, (portion.modifier or "").strip(), unit) if part).strip()
+
+
 def food_measures(food):
-    measures = [
-        {"code": "g", "label": "grams", "grams": 1.0},
-        {"code": "100g", "label": "100 grams", "grams": 100.0},
-        {"code": "oz", "label": "ounces (28.35 g)", "grams": 28.349523125},
-        {"code": "lb", "label": "pounds (453.59 g)", "grams": 453.59237},
-        {"code": "kg", "label": "kilograms (1000 g)", "grams": 1000.0},
-    ]
+    """Serving sizes for a food, ordered like Cronometer: household portions first.
+
+    Exactly one measure has "default": True, the one to pre-select: a "medium"
+    portion if USDA has one, else the first portion, else the package serving,
+    else 100 g.
+    """
+    portions = []
     volume_reference = None
     direct_volume_units = set()
     serving_size = _positive_grams(getattr(food, "serving_size", None))
     if serving_size and str(getattr(food, "serving_size_unit", None)).lower() in ("g", "gram", "grams"):
         label = getattr(food, "household_serving_fulltext", None) or "1 serving"
-        measures.append({"code": "serving", "label": f"{label} ({float(serving_size):g} g)",
+        portions.append({"code": "serving", "label": f"{label} ({float(serving_size):g} g)",
                          "grams": float(serving_size)})
         volume = _portion_volume_ml(label)
-        if volume:
+        if volume and not _CUT_WORDS.search(label):
             direct_volume_units.add(volume[0])
             volume_reference = (float(serving_size), volume[1])
-    for index, portion in enumerate(getattr(food, "food_portions", ())):
+    for index, portion in enumerate(getattr(food, "food_portions", ()) or ()):
         portion_grams = _positive_grams(portion.gram_weight)
         if portion_grams is None:
             continue
-        label = (portion.portion_description or
-                 " ".join(part for part in (f"{float(portion.amount):g}" if portion.amount else "",
-                                            portion.modifier, portion.measure_unit) if part).strip() or
-                 "1 portion")
-        if label.lower().startswith("quantity not specified"):
+        if (portion.portion_description or "").lower().startswith("quantity not specified"):
             continue
-        measures.append({"code": f"portion:{index}",
+        label = _portion_label(portion) or "1 portion"
+        portions.append({"code": f"portion:{index}",
                          "label": f"{label} ({portion_grams:g} g)",
                          "grams": portion_grams})
+        if _CUT_WORDS.search(label):
+            continue
         volume = (_portion_volume_ml(portion.measure_unit, portion.amount)
                   or _portion_volume_ml(portion.portion_description, portion.amount))
         if volume:
             direct_volume_units.add(volume[0])
             if volume_reference is None:
                 volume_reference = (portion_grams, volume[1])
+
+    volumes = []
     if volume_reference:
         reference_grams, reference_ml = volume_reference
-        hundred_ml_grams = round(reference_grams * 100 / reference_ml, 3)
-        if hundred_ml_grams > 0:
-            measures.append({"code": "100ml",
-                             "label": f"100 milliliters (about {hundred_ml_grams:g} g, based on USDA portion)",
-                             "grams": hundred_ml_grams})
-        for code, label in (("cup", "cups"), ("fl_oz", "fluid ounces"),
-                            ("tbsp", "tablespoons"), ("tsp", "teaspoons"),
-                            ("ml", "milliliters")):
+        for code, label in (("cup", "1 cup"), ("tbsp", "1 tbsp"), ("tsp", "1 tsp"),
+                            ("fl_oz", "1 fl oz"), ("ml", "1 ml")):
             if code in direct_volume_units:
                 continue
             grams = round(reference_grams * _VOLUME_ML[code] / reference_ml, 3)
             if grams > 0:
-                measures.append({"code": f"volume:{code}",
-                                 "label": f"{label} (about {grams:g} g, based on USDA portion)",
-                                 "grams": grams})
+                volumes.append({"code": f"volume:{code}", "label": f"{label} ({grams:g} g)", "grams": grams})
+
+    measures = portions + volumes + [
+        {"code": "g", "label": "g", "grams": 1.0},
+        {"code": "oz", "label": "oz (28.35 g)", "grams": 28.349523125},
+        {"code": "lb", "label": "lb (453.59 g)", "grams": 453.59237},
+        {"code": "100g", "label": "100 g", "grams": 100.0},
+    ]
+    default = (next((item for item in portions if re.search(r"\bmedium\b", item["label"], re.IGNORECASE)), None)
+               or (portions[0] if portions else None)
+               or next(item for item in measures if item["code"] == "100g"))
+    for item in measures:
+        item["default"] = item is default
     return measures
 
 

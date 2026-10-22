@@ -484,12 +484,14 @@
             option.dataset.grams = String(item.grams);
             return option;
           }));
-          const preferred = data.measures.find((item) => /large.*egg|egg.*large/i.test(item.label))
-            || data.measures.find((item) => /egg/i.test(item.label) && item.code.startsWith('portion:'))
-            || data.measures.find((item) => item.code.startsWith('portion:') || item.code === 'serving');
+          // The server marks the serving to pre-select (e.g. "1 medium"), like Cronometer.
+          const preferred = data.measures.find((item) => item.default);
           if (preferred && !quantityEdited) {
             measure.value = preferred.code;
             quantity.value = '1';
+          } else {
+            // A quantity already set (a "log again" food, or typed before the list loaded) is in grams.
+            measure.value = 'g';
           }
           previousMeasureGrams = Number(measure.selectedOptions[0].dataset.grams);
           status.textContent = `Selected ${food.description}. Choose a quantity and serving size.`;
@@ -524,7 +526,8 @@
               const title = document.createElement('span');
               title.textContent = food.description;
               const details = document.createElement('small');
-              details.textContent = `${food.brand_name || 'Generic'} · ${food.data_type} · FDC ${food.fdc_id}${food.gtin_upc ? ` · UPC ${food.gtin_upc}` : ''}`;
+              const source = food.data_type === 'Branded' ? (food.brand_name || 'Branded') : 'USDA';
+              details.textContent = `${food.previously_logged ? 'Logged before · ' : ''}${source}${food.gtin_upc ? ` · UPC ${food.gtin_upc}` : ''}`;
               button.append(title, details);
               button.addEventListener('click', () => chooseFood(food));
               results.appendChild(button);
