@@ -12,7 +12,7 @@ The backend uses Flask, PostgreSQL, and SQLAlchemy. It has server-rendered pages
 - Daily reports, weekly recaps, saved days, and frequently logged foods.
 - PostgreSQL migrations, Docker setup, OpenAPI documentation, and automated tests.
 
-Food search needs a USDA API key, and exercise search needs an API Ninjas key. Open `/login` for the meals log. I'm still working on hosted deployment.
+Food search needs a USDA API key, and exercise search needs an API Ninjas key. Open `/login` for the meals log. The API runs on Heroku and stores records in Heroku Postgres.
 
 ## How I organised it
 
@@ -33,7 +33,7 @@ I split the routes, validation, calculations, and database work into separate pa
 | `services/` | Nutrition calculations, external integrations, and application operations. |
 | `migrations/` | Versioned Alembic migrations through Flask-Migrate. |
 | `tests/conftest.py` | Isolated application, database, and authentication fixtures. |
-| `.github/workflows/build-deploy.yml` | PostgreSQL tests, optional Docker publishing, and gated Vercel deployment. |
+| `.github/workflows/build-deploy.yml` | PostgreSQL tests, Alembic upgrade, Heroku deploy, optional Docker publishing, and gated Vercel deployment. |
 
 A request moves from a route to a Pydantic schema, then a service, a SQLAlchemy model, and PostgreSQL. I check that the user in a JWT still exists, and I scope resource queries to the signed-in user.
 
@@ -127,28 +127,22 @@ The tests use a separate PostgreSQL database named `nutrition_test` by default, 
 
 Docker publishing is optional: set the repository variable `PUBLISH_DOCKER_IMAGE=true` and production environment secrets `DOCKER_HUB_USERNAME` and `DOCKER_HUB_ACCESS_TOKEN`. Successful main branch builds then publish `<username>/nutrition-tracker:latest`.
 
-## Deployment setup
+## Heroku and CI/CD
 
-I've set up a gated Vercel deployment, although hosted deployment is still in progress. Vercel runs the Flask `app` from `app.py` with Python 3.14. After the PostgreSQL tests pass, the job applies Alembic migrations to the hosted database and deploys the app. I disabled Vercel's automatic Git deployment in `vercel.json` so GitHub Actions controls that sequence.
+The Heroku app [nutrition-tracker-alsayed](https://nutrition-tracker-alsayed-90b0d9adaf0f.herokuapp.com/) runs this API on Python 3.14. The Heroku Postgres addon sets `DATABASE_URL`. The app turns Heroku's `postgres://` URL into `postgresql+psycopg` and requires SSL for every host except localhost and the local Docker database.
 
-For production, connect a hosted PostgreSQL database to the Vercel project. The Neon integration supplies `DATABASE_URL`. The local Docker database at `127.0.0.1` cannot be reached from Vercel or GitHub Actions. The deployment job reads the production URL through Vercel CLI when it applies migrations, so the hosted database also needs to accept connections from GitHub Actions.
+Each Heroku release applies the Alembic migrations in `migrations/` before Gunicorn starts:
 
-Create a GitHub Actions environment named `deployment` and add these environment secrets:
+```text
+release: python -m flask --app main db upgrade
+web: gunicorn --bind 0.0.0.0:$PORT "main:create_app()"
+```
 
-| Secret | Purpose |
-| --- | --- |
-| `VERCEL_TOKEN` | Vercel API token used by the deployment job. |
-| `VERCEL_ORG_ID` | Vercel account or team ID from the linked project's `.vercel/project.json`. |
-| `VERCEL_PROJECT_ID` | Vercel project ID from the same file. |
-| `SECRET_KEY` | Random Flask session signing key, separate from local development. |
-| `JWT_SECRET_KEY` | Random JWT signing key, separate from the Flask key. |
-| `FDC_API_KEY` | USDA FoodData Central API key for food search and logging. |
-| `API_NINJAS_KEY` | API Ninjas key for exercise search, if used. |
-| `FRONTEND_ORIGIN` | Allowed frontend origin for CORS, when a frontend is available. |
+GitHub Actions runs on every push and pull request. The `build` job starts PostgreSQL 16, runs `flask db upgrade`, then pytest. A push to `main` that passes those tests deploys by pushing to Heroku. That job uses the `production` environment secret `HEROKU_API_KEY`. Heroku config vars, separate from the local `.env`, are `SECRET_KEY`, `JWT_SECRET_KEY`, `FDC_API_KEY`, `API_NINJAS_KEY`, and `FRONTEND_ORIGIN`. The addon owns `DATABASE_URL`.
 
-The workflow passes the app settings to Vercel as deployment environment variables. I keep `DATABASE_URL` in the Vercel integration instead of copying it into GitHub secrets. Once the database and secrets are ready, set the repository variable `ENABLE_VERCEL_DEPLOY=true`. Pushes to `main` will then deploy after tests pass. Until you set that variable, the deployment job stays off.
+`/api/v1/health` checks the process. `/api/v1/ready` checks PostgreSQL.
 
-The Vercel CLI also ignores `.env`, `instance/`, and tests through `.vercelignore`. Do not commit production credentials.
+The workflow also still deploys to Vercel on `main` after the same tests. Do not commit production credentials.
 
 ## Framework references
 

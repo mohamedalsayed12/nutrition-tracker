@@ -1,0 +1,33 @@
+{
+  "name": "Nutrition Tracker",
+  "description": "Flask nutrition API on Heroku Postgres, with Alembic migrations on each release.",
+  "stack": "heroku-24",
+  "addons": [
+    "heroku-postgresql:essential-0"
+  ],
+  "env": {
+    "SECRET_KEY": {
+      "description": "Flask session signing key.",
+      "generator": "secret"
+    },
+    "JWT_SECRET_KEY": {
+      "description": "JWT signing key, separate from SECRET_KEY.",
+      "generator": "secret"
+    },
+    "FDC_API_KEY": {
+      "description": "USDA FoodData Central key for food search and logging.",
+      "required": false
+    },
+    "API_NINJAS_KEY": {
+      "description": "API Ninjas key for exercise search.",
+      "required": false
+    },
+    "FRONTEND_ORIGIN": {
+      "description": "Comma-separated browser origins allowed to call the API.",
+      "required": false
+    }
+  },
+  "scripts": {
+    "postdeploy": "python -m flask --app main db upgrade"
+  }
+}

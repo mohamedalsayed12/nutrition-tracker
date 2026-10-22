@@ -18,6 +18,23 @@ def test_test_factory_needs_no_local_database_settings(monkeypatch):
         config.database_url()
 
 
+def test_heroku_database_url_uses_psycopg_and_requires_ssl(monkeypatch):
+    monkeypatch.setattr(config, "load_dotenv", lambda *_: None)
+    monkeypatch.setenv("DATABASE_URL", "postgres://nutrition:secret@ec2-1-2-3-4.compute.amazonaws.com:5432/nutrition")
+    url = config.database_url()
+    assert url.drivername == "postgresql+psycopg"
+    assert url.host == "ec2-1-2-3-4.compute.amazonaws.com"
+    assert url.query["sslmode"] == "require"
+
+
+def test_local_database_url_does_not_require_ssl(monkeypatch):
+    monkeypatch.setattr(config, "load_dotenv", lambda *_: None)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://nutrition:secret@localhost:5432/nutrition")
+    url = config.database_url()
+    assert url.drivername == "postgresql+psycopg"
+    assert "sslmode" not in url.query
+
+
 def test_sqlite_url_is_rejected():
     with pytest.raises(RuntimeError, match="PostgreSQL"):
         create_app({"SECRET_KEY": "a" * 32, "JWT_SECRET_KEY": "b" * 32,

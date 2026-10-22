@@ -17,6 +17,9 @@ def database_url():
             url = url.set(drivername="postgresql+psycopg")
         if url.get_backend_name() != "postgresql":
             raise RuntimeError("PostgreSQL is required.")
+        local_hosts = {None, "localhost", "127.0.0.1", "database"}
+        if url.host not in local_hosts and "sslmode" not in url.query:
+            url = url.set(query={**dict(url.query), "sslmode": "require"})
         return url
     fields = ("DATABASE_HOSTNAME", "DATABASE_NAME", "DATABASE_USERNAME", "DATABASE_PASSWORD")
     if any(os.getenv(field) for field in fields):
