@@ -2,10 +2,65 @@ import re
 from datetime import timezone
 from decimal import Decimal, InvalidOperation
 
-from healthsciencecalculator.get_bmr import get_bmr
-from healthsciencecalculator.get_tdee import get_tdee
 from services.nutrient_targets import apply_menstruation_targets, micronutrient_targets
 from services.weekly_recap import food_macros
+
+
+# Activity multipliers for total daily energy expenditure (TDEE = BMR x factor).
+ACTIVITY_FACTORS = {
+    "sedentary": 1.2,
+    "lightly active": 1.375,
+    "moderately active": 1.55,
+    "very active": 1.725,
+    "extra active": 1.9,
+}
+
+
+def mifflin_st_jeor_bmr(weight_kg, height_cm, age, sex):
+    """Resting energy in kcal/day from weight, height, age and sex.
+
+    Mifflin-St Jeor (1990) is the equation the Academy of Nutrition and Dietetics
+    recommends for healthy adults, and the one Cronometer uses by default. It is
+    closer to measured values than the older Harris-Benedict equation.
+    https://pubmed.ncbi.nlm.nih.gov/2305711/
+    """
+    if weight_kg <= 0 or height_cm <= 0 or age <= 0:
+        raise ValueError("Weight, height and age must be positive.")
+    base = 10 * weight_kg + 6.25 * height_cm - 5 * age
+    if sex == "male":
+        return round(base + 5, 1)
+    if sex == "female":
+        return round(base - 161, 1)
+    raise ValueError('Sex must be "male" or "female".')
+
+
+# Protein per kg of body weight for the minimum target.
+# - 0.8 g/kg: the adult RDA (National Academies, Dietary Reference Intakes).
+# - 0.85 g/kg at age 18: the RDA for ages 14-18.
+# - 1.0 g/kg from age 65: PROT-AGE and ESPEN advice for older adults, to limit muscle loss.
+# - 1.2 g/kg when losing weight: helps keep muscle in a calorie deficit.
+# - 1.6 g/kg when gaining weight: where extra protein stops adding muscle in
+#   resistance training (Morton et al., 2018 meta-analysis).
+PROTEIN_GOAL_MINIMUM_PER_KG = {"maintain": 0.0, "lose_weight": 1.2, "gain_weight": 1.6}
+
+
+def protein_per_kg(age, goal="maintain"):
+    rda = 0.85 if age <= 18 else 1.0 if age >= 65 else 0.8
+    return max(rda, PROTEIN_GOAL_MINIMUM_PER_KG.get(goal, 0.0))
+
+
+def protein_targets(calories, weight_kg, age, goal="maintain"):
+    """(minimum, maximum) grams of protein a day.
+
+    The minimum scales with body weight, age and goal; the maximum is 35% of
+    calories, the top of the acceptable range, and never below the minimum.
+    """
+    minimum = round(weight_kg * protein_per_kg(age, goal), 1)
+    return minimum, protein_maximum(calories, minimum)
+
+
+def protein_maximum(calories, minimum):
+    return max(round(calories * 0.35 / 4, 1), minimum or 0)
 
 
 class UserInfo:
@@ -24,10 +79,12 @@ class UserInfo:
         self.activity_level = activity_level
 
     def calculate_bmr(self):
-        return get_bmr(self.weight, self.height, self.age, self.gender)
+        return mifflin_st_jeor_bmr(self.weight, self.height, self.age, self.gender)
 
     def calculate_tdee(self, activity_level):
-        return get_tdee(self.calculate_bmr(), activity_level)
+        if activity_level not in ACTIVITY_FACTORS:
+            raise ValueError("Choose a valid activity level.")
+        return round(self.calculate_bmr() * ACTIVITY_FACTORS[activity_level], 1)
 
 
 def calculate_goal_targets(info, goal, pregnancy_active):
@@ -46,8 +103,8 @@ def calculate_goal_targets(info, goal, pregnancy_active):
         calories = tdee + 300
     else:
         raise ValueError("Choose a valid goal.")
-    return (bmr, tdee, round(calories, 1), round(calories * 0.10 / 4, 1),
-            round(calories * 0.35 / 4, 1), round(calories * 0.55 / 4, 1))
+    protein_min, protein_max = protein_targets(calories, info.weight, info.age, goal)
+    return (bmr, tdee, round(calories, 1), protein_min, protein_max, round(calories * 0.55 / 4, 1))
 
 
 def configured_micronutrients(age, sex, preferences):
@@ -71,8 +128,10 @@ def apply_health_preferences(nutrition, preferences):
     if calories is None and "pregnancy" not in (preferences.conditions or []):
         calories = preferences.base_calories
     if preferences.custom_calories is not None:
-        nutrition.protein_min = round(calories * 0.10 / 4, 1)
-        nutrition.protein_max = round(calories * 0.35 / 4, 1)
+        # The weight-based minimum stays; only the 35%-of-calories maximum follows the care plan.
+        nutrition.protein_min = (preferences.base_protein_min if preferences.base_protein_min is not None
+                                 else round(calories * 0.10 / 4, 1))
+        nutrition.protein_max = protein_maximum(calories, nutrition.protein_min)
     else:
         nutrition.protein_min = preferences.base_protein_min
         nutrition.protein_max = preferences.base_protein_max
@@ -154,12 +213,12 @@ EXERCISE_METS = {
 
 def estimate_exercise_calories(duration_minutes, activity_type, weight_kg, height_cm, age, sex):
     met = EXERCISE_METS[activity_type][0]
-    if sex == "male":
-        resting_kcal_day = 66.4730 + 5.0033 * height_cm + 13.7516 * weight_kg - 6.7550 * age
-    elif sex == "female":
-        resting_kcal_day = 655.0955 + 1.8496 * height_cm + 9.5634 * weight_kg - 4.6756 * age
-    else:
+    if sex not in ("male", "female"):
         raise ValueError("Update your nutrition sex before estimating exercise calories.")
+    try:
+        resting_kcal_day = mifflin_st_jeor_bmr(weight_kg, height_cm, age, sex)
+    except ValueError:
+        resting_kcal_day = 0
     if resting_kcal_day <= 0:
         raise ValueError("Update your nutrition measurements before estimating exercise calories.")
     return round(met * resting_kcal_day * duration_minutes / 1440, 1)
@@ -335,8 +394,11 @@ def daily_target_progress(today_food_logs, daily_calorie_target, exercise_credit
     if getattr(preferences, "custom_fat", None) is not None:
         fat_range = (preferences.custom_fat, preferences.custom_fat)
     custom_macros = custom_macro_targets(daily_calorie_target, macro_split, preferences)
-    protein_min = round(daily_calorie_target * 0.10 / 4, 1) if exercise_credit_today else nutrition.protein_min if nutrition is not None else None
-    protein_max = round(daily_calorie_target * 0.35 / 4, 1) if exercise_credit_today else nutrition.protein_max if nutrition is not None else None
+    # Extra exercise raises the calorie target, so the 35% maximum rises with it; the
+    # weight-based minimum does not change.
+    protein_min = nutrition.protein_min if nutrition is not None else None
+    protein_max = (protein_maximum(daily_calorie_target, protein_min) if exercise_credit_today and nutrition is not None
+                   else nutrition.protein_max if nutrition is not None else None)
     if getattr(preferences, "custom_protein", None) is not None:
         protein_min = protein_max = preferences.custom_protein
     carbs_target = (preferences.custom_carbs if preferences is not None and preferences.custom_carbs is not None

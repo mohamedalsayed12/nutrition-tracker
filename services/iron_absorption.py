@@ -25,6 +25,11 @@ IRON_WORTH_CHECKING_MG = 2.0
 # non-heme iron absorption show a clear increase from roughly this amount upwards.
 VITAMIN_C_HELPFUL_MG = 25.0
 
+# The tips only show for health settings that raise iron needs: periods (iron lost
+# each month) and pregnancy (27 mg/day). Everyone else's iron target is easily met
+# without planning meals around it, so the tips would just be noise.
+IRON_CONDITIONS = {"menstruation", "pregnancy"}
+
 VITAMIN_C_IDEAS = "red or yellow pepper, an orange, kiwi, strawberries, tomato or broccoli"
 
 
@@ -47,11 +52,13 @@ def _meal_amount(food_logs, nutrient_name):
 def iron_absorption_checks(food_logs, conditions=()):
     """One entry per meal that has a meaningful amount of iron.
 
-    status is "add_vitamin_c" when the meal has iron but little vitamin C, or
-    "good" when it already pairs the two. highlight is True when the user has
-    selected periods, so the app can show the tip more prominently.
+    Only for users whose health settings include periods or pregnancy; for
+    everyone else this returns an empty list. status is "add_vitamin_c" when the
+    meal has iron but little vitamin C, or "good" when it already pairs the two.
     """
-    highlight = "menstruation" in (conditions or ())
+    if not IRON_CONDITIONS & set(conditions or ()):
+        return []
+    highlight = True
     checks = []
     for meal in MEALS:
         logs = [log for log in food_logs if log.meal == meal]

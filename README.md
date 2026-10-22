@@ -11,7 +11,8 @@ The backend uses Flask, PostgreSQL, and SQLAlchemy. It has server-rendered pages
 - Food search ranked like Cronometer: everyday generic foods first ("Milk, whole" before "Coconut milk"), processed variants lower, branded products after, and foods you have logged before at the top. Servings list household portions first and pre-select one, such as "1 medium".
 - Calorie and nutrient targets, macro split settings, and health preferences.
 - Daily reports, weekly recaps, saved days, and frequently logged foods.
-- A per-meal iron check: vitamin C only helps iron absorption when it is eaten in the same meal, so the daily report flags meals with iron but little vitamin C and suggests what to add (shown more prominently when periods are selected).
+- A per-meal iron check: vitamin C only helps iron absorption when it is eaten in the same meal, so when periods or pregnancy are selected in health settings, the daily report flags meals with iron but little vitamin C and suggests what to add.
+- Targets from your own body: calories use the Mifflin-St Jeor equation (sex, height, weight, age) times your activity level; the protein minimum is grams per kg of body weight, set by age and goal (0.8 g/kg adult RDA, 1.0 from 65, 1.2 when losing, 1.6 when gaining); vitamins and minerals use the reference values for your age and sex.
 - PostgreSQL migrations, Docker setup, OpenAPI documentation, and automated tests.
 
 Food search needs a USDA API key, and exercise search needs an API Ninjas key. Open `/login` for the meals log. The API runs on Heroku and stores records in Heroku Postgres.

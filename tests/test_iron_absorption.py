@@ -1,6 +1,12 @@
 from types import SimpleNamespace
 
-from services.iron_absorption import iron_absorption_checks
+from services.iron_absorption import iron_absorption_checks as _checks
+
+PERIODS = ["menstruation"]
+
+
+def iron_absorption_checks(logs, conditions=PERIODS):
+    return _checks(logs, conditions)
 
 
 def food(meal, iron_mg=None, vitamin_c_mg=None, iron_unit="mg"):
@@ -16,7 +22,7 @@ def test_meal_with_iron_and_little_vitamin_c_gets_a_tip():
     checks = iron_absorption_checks([food("lunch", iron_mg=4.2, vitamin_c_mg=3)])
     assert checks == [{
         "meal": "lunch", "iron_mg": 4.2, "vitamin_c_mg": 3.0, "status": "add_vitamin_c",
-        "tip": checks[0]["tip"], "highlight": False,
+        "tip": checks[0]["tip"], "highlight": True,
     }]
     assert "4.2 mg of iron" in checks[0]["tip"]
 
@@ -48,12 +54,15 @@ def test_units_are_converted_and_missing_vitamin_c_data_is_reported_as_none():
     assert checks[0]["status"] == "add_vitamin_c"
 
 
-def test_periods_highlight_the_tip():
-    checks = iron_absorption_checks([food("lunch", iron_mg=4, vitamin_c_mg=0)], ["menstruation"])
-    assert checks[0]["highlight"] is True
+def test_tips_only_show_for_periods_or_pregnancy():
+    lunch = [food("lunch", iron_mg=4, vitamin_c_mg=0)]
+    assert iron_absorption_checks(lunch, []) == []
+    assert iron_absorption_checks(lunch, ["diabetes", "ibs"]) == []
+    assert len(iron_absorption_checks(lunch, ["menstruation"])) == 1
+    assert len(iron_absorption_checks(lunch, ["pregnancy"])) == 1
 
 
-def test_daily_report_includes_meal_checks(client, monkeypatch):
+def test_daily_report_has_no_iron_tips_without_a_condition(client, monkeypatch):
     lentils = SimpleNamespace(description="Lentils, cooked", nutrients=[
         SimpleNamespace(name="Energy", unit_name="kcal", amount=116),
         SimpleNamespace(name="Iron, Fe", unit_name="mg", amount=3.3),
@@ -70,5 +79,4 @@ def test_daily_report_includes_meal_checks(client, monkeypatch):
     assert client.get("/api/v1/reports/daily", headers=headers).json["iron_absorption"] == []
     assert client.post("/api/v1/food-logs", json={"meal": "dinner", "fdc_id": 1, "grams": 200},
                        headers=headers).status_code == 201
-    checks = client.get("/api/v1/reports/daily", headers=headers).json["iron_absorption"]
-    assert [(c["meal"], c["status"], c["iron_mg"]) for c in checks] == [("dinner", "add_vitamin_c", 6.6)]
+    assert client.get("/api/v1/reports/daily", headers=headers).json["iron_absorption"] == []

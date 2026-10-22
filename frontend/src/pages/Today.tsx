@@ -510,31 +510,85 @@ function ConditionsGroup({ settings }: { settings: HealthSettings }) {
   )
 }
 
-function Micronutrients({ items }: { items: Array<{ name: string; unit: string; logged: number | null; target: number; percent: number | null; bar_width: number; limit: boolean; partial: boolean }> }) {
-  const [open, setOpen] = useState(false)
+type MicronutrientItem = { name: string; unit: string; logged: number | null; target: number; percent: number | null; bar_width: number; limit: boolean; partial: boolean }
+
+// The ones most people are short of (or over, for sodium), shown when the section is opened.
+const KEY_NUTRIENTS = ["Vitamin D", "Vitamin C", "Vitamin B12", "Iron", "Calcium", "Magnesium", "Potassium", "Sodium"]
+const VITAMIN_PREFIXES = ["Vitamin", "Thiamin", "Riboflavin", "Niacin", "Pantothenic", "Biotin", "Folate", "Choline"]
+const MICRO_VIEW_KEY = "nutrition.micronutrients_view"
+type MicroView = "closed" | "key" | "all"
+
+function readMicroView(): MicroView {
+  try {
+    const saved = localStorage.getItem(MICRO_VIEW_KEY)
+    return saved === "key" || saved === "all" ? saved : "closed"
+  } catch {
+    return "closed"
+  }
+}
+
+function Micronutrients({ items }: { items: MicronutrientItem[] }) {
+  const [view, setViewState] = useState<MicroView>(readMicroView)
   if (items.length === 0) return null
+  const setView = (next: MicroView) => {
+    setViewState(next)
+    try { localStorage.setItem(MICRO_VIEW_KEY, next) } catch { /* private mode */ }
+  }
+  const open = view !== "closed"
+  const goals = items.filter((item) => !item.limit)
+  const met = goals.filter((item) => (item.percent ?? 0) >= 100).length
+  const key = KEY_NUTRIENTS.map((name) => items.find((item) => item.name === name)).filter((item): item is MicronutrientItem => item != null)
+  const vitamins = items.filter((item) => VITAMIN_PREFIXES.some((prefix) => item.name.startsWith(prefix)))
+  const minerals = items.filter((item) => !vitamins.includes(item))
+
+  const bar = (item: MicronutrientItem) => (
+    <ProgressBar
+      key={item.name}
+      label={item.limit ? `${item.name} (limit)` : item.name}
+      value={item.bar_width}
+      tone={intakeTone(item.percent, item.limit)}
+      detail={`${item.logged ?? 0} / ${item.target} ${item.unit}${item.partial ? " · partial" : ""}`}
+    />
+  )
+
   return (
     <section className="rounded-2xl border border-line bg-card px-4 py-5">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 text-left"
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        aria-controls="micronutrient-list"
+        onClick={() => setView(open ? "closed" : "key")}
       >
-        <h2 className="font-display text-lg font-medium">Nutrient targets</h2>
+        <span>
+          <span className="block font-display text-lg font-medium">Vitamins and minerals</span>
+          <span className="block text-sm text-muted">{met} of {goals.length} targets met today</span>
+        </span>
         <ChevronDown className={open ? "rotate-180" : undefined} />
       </button>
       {open ? (
-        <div className="mt-4 space-y-4">
-          {items.map((item) => (
-            <ProgressBar
-              key={item.name}
-              label={item.name}
-              value={item.bar_width}
-              tone={intakeTone(item.percent, item.limit)}
-              detail={`${item.logged ?? 0} / ${item.target} ${item.unit}${item.partial ? " · partial" : ""}`}
-            />
-          ))}
+        <div id="micronutrient-list" className="mt-4">
+          {view === "key" ? (
+            <div className="space-y-4">{key.map(bar)}</div>
+          ) : (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Vitamins</h3>
+                {vitamins.map(bar)}
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Minerals</h3>
+                {minerals.map(bar)}
+              </div>
+            </div>
+          )}
+          <button
+            type="button"
+            className="mt-5 w-full rounded-2xl border border-line py-2.5 text-sm font-semibold text-accent hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            onClick={() => setView(view === "all" ? "key" : "all")}
+          >
+            {view === "all" ? "Show key nutrients only" : `Show all ${items.length}`}
+          </button>
         </div>
       ) : null}
     </section>
