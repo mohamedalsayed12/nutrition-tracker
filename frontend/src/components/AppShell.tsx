@@ -3,9 +3,9 @@ import { cn } from "../lib/cn.ts"
 import { ThemeToggle } from "./ThemeToggle.tsx"
 
 const links = [
-  { to: "/", label: "Today", end: true },
-  { to: "/add", label: "Add", end: false },
-  { to: "/weekly", label: "Weekly", end: false },
+  { to: "/", label: "Diary", end: true },
+  { to: "/weekly", label: "Trends", end: false },
+  { to: "/add", label: "Foods", end: false },
   { to: "/settings", label: "Settings", end: false },
 ]
 
@@ -37,7 +37,7 @@ export function AppShell() {
             <ThemeToggle />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-3xl px-4 pb-8 lg:px-8">
+        <main className="mx-auto w-full max-w-5xl px-4 pb-8 lg:px-8">
           <Outlet />
         </main>
       </div>

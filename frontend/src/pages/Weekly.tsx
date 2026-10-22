@@ -51,7 +51,7 @@ export function WeeklyPage() {
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-medium">Weekly</h1>
+          <h1 className="font-display text-3xl font-medium">Trends</h1>
           <p className="text-sm text-muted">{formatDayLabel(weekStart)} – {formatDayLabel(weekEnd)}</p>
         </div>
         <div className="flex gap-2">

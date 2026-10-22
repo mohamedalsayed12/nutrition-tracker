@@ -9,13 +9,16 @@ from services.nutrient_scoring import remaining_targets
 
 
 class ConditionTargetTest(unittest.TestCase):
-    def test_periods_keep_age_references_and_personal_overrides(self):
+    def test_periods_raise_iron_and_vitamin_c_and_personal_overrides_win(self):
         preferences = SimpleNamespace(conditions=["menstruation", "ibs", "diabetes"],
                                       micronutrient_overrides={})
-        for age, expected in ((16, 15), (30, 18), (55, 8)):
-            targets = configured_micronutrients(age, "female", preferences)
-            self.assertEqual(targets, micronutrient_targets(age, "female"))
-            self.assertEqual(next(row["target"] for row in targets if row["name"] == "Iron"), expected)
+        for age, iron, vitamin_c in ((16, 15, 75), (30, 18, 90), (55, 18, 90)):
+            targets = {row["name"]: row["target"] for row in configured_micronutrients(age, "female", preferences)}
+            self.assertEqual(targets["Iron"], iron)
+            self.assertEqual(targets["Vitamin C"], vitamin_c)
+        plain = {row["name"]: row["target"] for row in micronutrient_targets(30, "female")}
+        self.assertEqual(plain["Iron"], 18)
+        self.assertEqual(plain["Vitamin C"], 75)
         preferences.micronutrient_overrides = {"Iron": 20}
         targets = configured_micronutrients(30, "female", preferences)
         iron = next(row for row in targets if row["name"] == "Iron")

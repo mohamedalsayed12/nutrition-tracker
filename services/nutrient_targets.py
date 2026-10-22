@@ -72,13 +72,26 @@ CONDITION_MICRONUTRIENTS = {
     "menstruation": {
         "label": "Periods / menstruation",
         "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
-        "summary": "Menstrual blood loss makes iron intake worth watching. The female reference already uses 15 mg/day at ages 14–18 and 18 mg/day at ages 19–50; selecting periods does not add another increase. If your UserInfo reference does not fit your menstrual status, ask your clinician for a personal iron target. Heavy periods warrant assessment for iron deficiency.",
+        "summary": "Periods raise the iron target to the menstrual reference when that is higher: 15 mg/day at ages 14–18 and 18 mg/day from age 19. Vitamin C is raised to 75 mg under 19 and 90 mg after that, because vitamin C helps the body absorb iron from plant foods. Heavy bleeding still needs clinical assessment.",
         "nutrients": {
-            "Iron": "Menstrual bleeding increases iron losses. Your age/sex reference or saved personal target is used; heavy bleeding needs clinical assessment.",
-            "Vitamin C": "Vitamin C helps absorb iron from plant foods. Its usual intake target is retained.",
+            "Iron": "Menstrual bleeding increases iron losses, so the target uses the menstrual reference when that is higher than the usual age and sex value.",
+            "Vitamin C": "Vitamin C helps the body absorb iron from plant foods, so the target is raised while periods are selected.",
         },
     },
 }
+
+
+def apply_menstruation_targets(targets, age):
+    if age < 14:
+        return targets
+    iron = 15 if age <= 18 else 18
+    vitamin_c = 75 if age <= 18 else 90
+    for target in targets:
+        if target["name"] == "Iron":
+            target["target"] = max(target["target"], iron)
+        elif target["name"] == "Vitamin C":
+            target["target"] = max(target["target"], vitamin_c)
+    return targets
 
 
 def condition_micronutrient_guidance(conditions):

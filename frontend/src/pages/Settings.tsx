@@ -38,7 +38,7 @@ const conditionChoices: Array<{ value: HealthCondition; label: string; detail: s
   { value: "pregnancy", label: "Pregnant", detail: "Uses pregnancy reference targets. Periods cannot be selected at the same time." },
   { value: "diabetes", label: "Diabetes", detail: "Shows the diabetes note returned by the API." },
   { value: "ibs", label: "IBS", detail: "Shows the IBS note returned by the API." },
-  { value: "menstruation", label: "Periods", detail: "Shows the menstruation note returned by the API." },
+  { value: "menstruation", label: "Periods", detail: "Raises iron to the menstrual reference and raises vitamin C, which helps the body absorb iron." },
 ]
 
 const macroLabels: Array<{ key: keyof MacroPercents; label: string }> = [

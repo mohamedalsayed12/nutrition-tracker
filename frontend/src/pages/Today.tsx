@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { useForm } from "react-hook-form"
 import { Link, Navigate } from "react-router-dom"
 import { z } from "zod"
@@ -8,7 +8,7 @@ import { ApiError } from "../api/client.ts"
 import { createActivityLog, deleteActivityLog, listRecentActivityLogs } from "../api/activityLogs.ts"
 import { deleteFoodLog, listRecentFoodLogs } from "../api/foodLogs.ts"
 import { getDailyReport, getSavedDays, saveDay } from "../api/reports.ts"
-import { getHealthSettings, getMacroSplit } from "../api/settings.ts"
+import { getHealthSettings, getMacroSplit, saveHealthSettings } from "../api/settings.ts"
 import { Button } from "../components/ui/Button.tsx"
 import { Card } from "../components/ui/Card.tsx"
 import { EmptyState } from "../components/ui/EmptyState.tsx"
@@ -18,14 +18,20 @@ import { ProgressRing } from "../components/ui/ProgressRing.tsx"
 import { Select } from "../components/ui/Select.tsx"
 import { Skeleton } from "../components/ui/Skeleton.tsx"
 import { useToast } from "../components/ui/Toast.tsx"
-import { useCurrentUser } from "../hooks/useCurrentUser.ts"
 import { useNutrition } from "../hooks/useNutrition.ts"
-import { browserTimeZone, formatDayLabel, isSameLocalDay, localDateISO } from "../lib/dates.ts"
+import { addDays, browserTimeZone, formatDiaryDate, isSameLocalDay, localDateISO } from "../lib/dates.ts"
 import { formatGrams, formatKcal } from "../lib/format.ts"
 import { macroGramTargets } from "../lib/macroSplit.ts"
 import { mealOptions } from "../lib/meals.ts"
 import { intakeTone } from "../lib/progressTone.ts"
-import type { ActivityType, FoodLog, NutritionGoals } from "../types/api.ts"
+import type { ActivityType, FoodLog, HealthCondition, HealthSettings, NutritionGoals } from "../types/api.ts"
+
+const conditionChoices: Array<{ value: HealthCondition; label: string; detail: string }> = [
+  { value: "pregnancy", label: "Pregnant", detail: "Uses pregnancy reference targets. Periods cannot be selected at the same time." },
+  { value: "diabetes", label: "Diabetes", detail: "Keeps the usual targets and shows the diabetes note." },
+  { value: "ibs", label: "IBS", detail: "Keeps the usual targets and shows nutrients a restricted diet can miss." },
+  { value: "menstruation", label: "Periods", detail: "Raises iron to the menstrual reference and raises vitamin C, which helps the body absorb iron." },
+]
 
 const activityTypes: Array<{ value: ActivityType; label: string }> = [
   { value: "walking", label: "Walking" },
@@ -52,18 +58,18 @@ const activitySchema = z.object({
 type ActivityInput = z.infer<typeof activitySchema>
 
 export function TodayPage() {
-  const user = useCurrentUser()
   const nutrition = useNutrition()
   const zone = browserTimeZone()
   const [today] = useState(() => localDateISO(new Date(), browserTimeZone()))
-  const report = useQuery({ queryKey: ["reports", "daily", today, zone], queryFn: () => getDailyReport(today, zone) })
+  const [day, setDay] = useState(today)
+  const report = useQuery({ queryKey: ["reports", "daily", day, zone], queryFn: () => getDailyReport(day, zone) })
   const logs = useQuery({ queryKey: ["food-logs", "recent"], queryFn: listRecentFoodLogs })
   const activities = useQuery({ queryKey: ["activity-logs", "recent"], queryFn: listRecentActivityLogs })
   const saved = useQuery({ queryKey: ["days"], queryFn: getSavedDays })
   const macros = useQuery({ queryKey: ["settings", "macros"], queryFn: getMacroSplit })
   const health = useQuery({ queryKey: ["settings", "health"], queryFn: getHealthSettings })
 
-  if (nutrition.isLoading || user.isLoading || report.isLoading || macros.isLoading || health.isLoading) {
+  if (nutrition.isLoading || report.isLoading || macros.isLoading || health.isLoading) {
     return (
       <div className="space-y-4" aria-busy="true">
         <Skeleton className="h-8 w-40" />
@@ -82,77 +88,102 @@ export function TodayPage() {
     )
   }
 
-  const dayLogs = (logs.data ?? []).filter((log) => isSameLocalDay(log.logged_at, today, zone))
-  const dayActivities = (activities.data ?? []).filter((log) => isSameLocalDay(log.logged_at, today, zone))
-  const logged = report.data.totals.Calories
+  const dayLogs = (logs.data ?? []).filter((log) => isSameLocalDay(log.logged_at, day, zone))
+  const dayActivities = (activities.data ?? []).filter((log) => isSameLocalDay(log.logged_at, day, zone))
+  const consumed = report.data.totals.Calories
+  const burned = dayActivities.reduce((sum, log) => sum + (log.calories_burned ?? 0), 0)
   const goal = report.data.calorie_goal
-  const tone = goal == null || goal <= 0 ? "accent" : intakeTone((logged / goal) * 100)
+  const remaining = goal == null ? null : goal - consumed
   const grams = goal == null ? null : macroGramTargets(goal, macros.data ?? { carbs_percent: 55, protein_percent: 20, fat_percent: 25 }, {
     carbs: health.data?.custom_carbs ?? null,
     protein: health.data?.custom_protein ?? null,
     fat: health.data?.custom_fat ?? null,
   })
+  const macroBars = report.data.progress.filter((item) => item.name !== "Calories")
 
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-sm font-semibold text-accent">{formatDayLabel(today)}</p>
-        <h1 className="font-display text-3xl font-medium">{user.data ? `Hi ${user.data.name}` : "Today"}</h1>
-      </div>
-      <Card className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-        <ProgressRing value={logged} max={goal ?? 0} label="Calories today" unit="kcal" tone={tone} caption={goal == null ? "No calorie target is saved." : undefined} />
-        <div className="text-center sm:text-left">
-          <p className="font-semibold">{goal == null ? "No calorie target" : `${formatKcal(logged)} of ${formatKcal(goal)}`}</p>
-          <p className="mt-1 text-sm text-muted">
-            {report.data.exercise_credit > 0 ? `Includes ${formatKcal(report.data.exercise_credit)} from extra exercise. ` : ""}
-            Green is on track, amber is under the target, and red is over a limit.
-          </p>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setDay((current) => addDays(current, -1))} aria-label="Previous day">Previous</Button>
+          <h1 className="font-display text-xl font-medium sm:text-2xl">{formatDiaryDate(day)}</h1>
+          <Button variant="secondary" size="sm" onClick={() => setDay((current) => addDays(current, 1))} aria-label="Next day">Next</Button>
         </div>
-      </Card>
-      <Card className="space-y-4">
-        <h2 className="font-display text-xl font-medium">Targets</h2>
-        {report.data.progress.length === 0 ? <p className="text-sm text-muted">Save a calorie target to see progress.</p> : report.data.progress.map((item) => {
-          const target = targetFor(item.name, goal, grams)
-          const logged = item.logged ?? 0
-          const percent = target != null && target > 0 ? (logged / target) * 100 : null
-          return (
+        <div className="flex items-center gap-2">
+          {day !== today ? <Button variant="ghost" size="sm" onClick={() => setDay(today)}>Today</Button> : null}
+          <SaveDayButton date={day} saved={(saved.data?.days ?? []).includes(day)} hasFood={report.data.food_log_count > 0} />
+        </div>
+      </div>
+
+      <section className="rounded-2xl border border-line bg-card px-4 py-5">
+        <h2 className="font-display text-lg font-medium">Energy summary</h2>
+        <div className="mt-4 grid grid-cols-3 justify-items-center gap-2">
+          <EnergyCircle label="Consumed" value={consumed} max={goal ?? consumed} tone={goal == null || goal <= 0 ? "accent" : intakeTone((consumed / goal) * 100)} />
+          <EnergyCircle label="Burned" value={burned} max={Math.max(burned, goal ?? 0)} tone="accent" />
+          <EnergyCircle
+            label={remaining != null && remaining < 0 ? "Over" : "Remaining"}
+            value={remaining == null ? 0 : Math.abs(remaining)}
+            max={goal ?? 0}
+            tone={remaining != null && remaining < 0 ? "danger" : "accent"}
+          />
+        </div>
+        {report.data.exercise_credit > 0 ? <p className="mt-3 text-center text-sm text-muted">Remaining includes {formatKcal(report.data.exercise_credit)} from extra exercise.</p> : null}
+      </section>
+
+      <section className="rounded-2xl border border-line bg-card px-4 py-5">
+        <h2 className="font-display text-lg font-medium">Macronutrient targets</h2>
+        <div className="mt-4 space-y-4">
+          {macroBars.length === 0 ? <p className="text-sm text-muted">Save a calorie target to see progress.</p> : macroBars.map((item) => {
+            const target = targetFor(item.name, goal, grams)
+            const amount = item.logged ?? 0
+            const percent = target != null && target > 0 ? (amount / target) * 100 : null
+            return (
+              <ProgressBar
+                key={item.name}
+                label={item.name}
+                value={percent ?? 0}
+                tone={intakeTone(percent)}
+                detail={`${amount} ${item.unit} · ${targetText(item.name, target, item.target_label)}`}
+              />
+            )
+          })}
+          {report.data.condition_nutrition.fiber_goal != null ? (
             <ProgressBar
-              key={item.name}
-              label={item.name}
-              value={percent ?? 0}
-              tone={intakeTone(percent)}
-              detail={`${logged} ${item.unit} · ${targetText(item.name, target, item.target_label)}${item.partial ? " · partial" : ""}`}
+              label="Fiber"
+              value={report.data.condition_nutrition.fiber_percent ?? 0}
+              tone={intakeTone(report.data.condition_nutrition.fiber_percent)}
+              detail={`${report.data.condition_nutrition.fiber_logged ?? 0} g · ${report.data.condition_nutrition.fiber_goal} g`}
             />
+          ) : null}
+        </div>
+      </section>
+
+      <Micronutrients items={report.data.micronutrients} />
+
+      <section className="overflow-hidden rounded-2xl border border-line bg-card">
+        <div className="flex gap-2 border-b border-line px-4 py-3">
+          <Link className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white" to="/add">+ Food</Link>
+          <a className="rounded-full border border-line px-4 py-2 text-sm font-semibold" href="#exercise">+ Exercise</a>
+        </div>
+        {logs.isError ? <p className="px-4 py-3 text-sm text-danger">Meals could not be loaded.</p> : null}
+        {logs.isLoading ? <Skeleton className="m-4 h-24" /> : mealOptions.map((meal) => {
+          const items = dayLogs.filter((log) => log.meal === meal.id)
+          const subtotal = items.reduce((sum, log) => sum + (foodKcal(log) ?? 0), 0)
+          return (
+            <DiaryGroup
+              key={meal.id}
+              title={meal.id === "snack" ? "Snacks" : meal.label}
+              subtotal={items.length === 0 ? "" : formatKcal(subtotal)}
+              addTo={`/add?meal=${meal.id}`}
+              addLabel="Add Food"
+            >
+              {items.map((log) => <FoodRow key={log.id} log={log} />)}
+            </DiaryGroup>
           )
         })}
-        {report.data.condition_nutrition.fiber_goal != null ? (
-          <ProgressBar
-            label="Fiber"
-            value={report.data.condition_nutrition.fiber_percent ?? 0}
-            tone={intakeTone(report.data.condition_nutrition.fiber_percent)}
-            detail={`${report.data.condition_nutrition.fiber_logged ?? 0} g · ${report.data.condition_nutrition.fiber_goal} g`}
-          />
-        ) : null}
-      </Card>
-      <Card>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-display text-xl font-medium">Meals</h2>
-          <Link className="text-sm font-semibold text-accent underline-offset-4 hover:underline" to="/add">Add food</Link>
-        </div>
-        {logs.isLoading ? <Skeleton className="mt-4 h-16 w-full" /> : null}
-        {logs.isError ? <p className="mt-3 text-sm text-danger">Meals could not be loaded.</p> : null}
-        {!logs.isLoading && dayLogs.length === 0 ? <p className="mt-3 text-sm text-muted">Nothing logged yet today.</p> : null}
-        <div className="mt-4 space-y-4">
-          {mealOptions.map((meal) => {
-            const items = dayLogs.filter((log) => log.meal === meal.id)
-            if (items.length === 0) return null
-            return <MealGroup key={meal.id} label={meal.label} items={items} />
-          })}
-        </div>
-      </Card>
-      <SaveDayCard date={today} saved={(saved.data?.days ?? []).includes(today)} hasFood={report.data.food_log_count > 0} />
-      {nutrition.data.configured ? <ExerciseCard nutrition={nutrition.data} activities={dayActivities} /> : null}
-      <Micronutrients items={report.data.micronutrients} />
+        <ExerciseGroup activities={dayActivities} burned={burned} nutrition={nutrition.data?.configured ? nutrition.data : null} />
+        {health.data ? <ConditionsGroup key={`${health.data.conditions.join("|")}:${health.data.trimester ?? ""}`} settings={health.data} /> : null}
+      </section>
     </div>
   )
 }
@@ -170,47 +201,119 @@ function targetText(name: string, target: number | null, fallback: string): stri
   return name === "Calories" ? formatKcal(target) : formatGrams(target)
 }
 
-function MealGroup({ label, items }: { label: string; items: FoodLog[] }) {
+function foodKcal(log: FoodLog): number | null {
+  const calories = log.nutrients.find((item) => item.unit.toLowerCase() === "kcal" && item.name.toLowerCase().startsWith("energy"))
+  return calories ? Math.round(calories.eaten) : null
+}
+
+function EnergyCircle({ label, value, max, tone }: { label: string; value: number; max: number; tone: "accent" | "amber" | "danger" }) {
+  return (
+    <figure className="flex flex-col items-center gap-2">
+      <ProgressRing size="sm" value={value} max={max} label={label} tone={tone} />
+      <figcaption className="text-sm font-semibold">{label}</figcaption>
+    </figure>
+  )
+}
+
+function DiaryGroup({ title, subtotal, addTo, addLabel, children }: { title: string; subtotal: string; addTo: string; addLabel: string; children: ReactNode }) {
+  return (
+    <section className="border-b border-line">
+      <div className="flex items-center justify-between bg-canvas px-4 py-2">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <span className="text-sm tabular-nums text-muted">{subtotal}</span>
+      </div>
+      <ul>{children}</ul>
+      <Link className="block px-4 py-2 text-sm font-semibold text-accent hover:underline" to={addTo}>+ {addLabel}</Link>
+    </section>
+  )
+}
+
+function FoodRow({ log }: { log: FoodLog }) {
   const queryClient = useQueryClient()
   const toast = useToast()
-  const [pendingId, setPendingId] = useState<number | null>(null)
+  const [pending, setPending] = useState(false)
+  const calories = foodKcal(log)
 
-  async function remove(id: number) {
-    setPendingId(id)
+  async function remove() {
+    setPending(true)
     try {
-      await deleteFoodLog(id)
+      await deleteFoodLog(log.id)
       await queryClient.invalidateQueries({ queryKey: ["food-logs"] })
       await queryClient.invalidateQueries({ queryKey: ["reports"] })
       await queryClient.invalidateQueries({ queryKey: ["foods", "frequent"] })
     } catch (error) {
       toast.push(error instanceof ApiError ? error.message : "The log could not be removed.", "danger")
     } finally {
-      setPendingId(null)
+      setPending(false)
     }
   }
 
   return (
-    <section>
-      <h3 className="text-sm font-semibold text-muted">{label}</h3>
-      <ul className="mt-2 space-y-2">
-        {items.map((log) => {
-          const calories = log.nutrients.find((item) => item.unit.toLowerCase() === "kcal" && item.name.toLowerCase().startsWith("energy"))
-          return (
-            <li key={log.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line px-3 py-2">
-              <span>
-                <span className="block font-semibold">{log.food_name}</span>
-                <span className="text-sm text-muted">{formatGrams(log.grams)}{calories ? ` · ${Math.round(calories.eaten)} kcal` : ""}</span>
-              </span>
-              <Button size="sm" variant="ghost" disabled={pendingId === log.id || log.id < 0} onClick={() => void remove(log.id)}>Remove</Button>
-            </li>
-          )
-        })}
+    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-t border-line px-4 py-2 text-sm">
+      <span className="font-semibold">{log.food_name}</span>
+      <span className="text-muted">{formatGrams(log.grams)}</span>
+      <span className="flex items-center gap-2 tabular-nums">
+        {calories == null ? "—" : calories}
+        <Button size="sm" variant="ghost" disabled={pending || log.id < 0} onClick={() => void remove()}>Remove</Button>
+      </span>
+    </li>
+  )
+}
+
+function ExerciseGroup({
+  activities,
+  burned,
+  nutrition,
+}: {
+  activities: Array<{ id: number; activity: string; duration_minutes: number | null; calories_burned: number | null }>
+  burned: number
+  nutrition: Extract<NutritionGoals, { configured: true }> | null
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section id="exercise">
+      <div className="flex items-center justify-between bg-canvas px-4 py-2">
+        <h2 className="text-sm font-semibold">Exercise</h2>
+        <span className="text-sm tabular-nums text-muted">{activities.length === 0 ? "" : formatKcal(burned)}</span>
+      </div>
+      <ul>
+        {activities.map((log) => <ExerciseRow key={log.id} log={log} />)}
       </ul>
+      <button type="button" className="block px-4 py-2 text-sm font-semibold text-accent hover:underline" onClick={() => setOpen((current) => !current)}>
+        + Add Exercise
+      </button>
+      {open && nutrition ? <div className="border-t border-line px-4 py-4"><ExerciseCard nutrition={nutrition} plain /></div> : null}
     </section>
   )
 }
 
-function SaveDayCard({ date, saved, hasFood }: { date: string; saved: boolean; hasFood: boolean }) {
+function ExerciseRow({ log }: { log: { id: number; activity: string; duration_minutes: number | null; calories_burned: number | null } }) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+
+  async function remove() {
+    try {
+      await deleteActivityLog(log.id)
+      await queryClient.invalidateQueries({ queryKey: ["activity-logs"] })
+      await queryClient.invalidateQueries({ queryKey: ["reports"] })
+    } catch (error) {
+      toast.push(error instanceof ApiError ? error.message : "Exercise could not be removed.", "danger")
+    }
+  }
+
+  return (
+    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-t border-line px-4 py-2 text-sm">
+      <span className="font-semibold">{log.activity}</span>
+      <span className="text-muted">{log.duration_minutes ?? "—"} min</span>
+      <span className="flex items-center gap-2 tabular-nums">
+        {log.calories_burned == null ? "—" : Math.round(log.calories_burned)}
+        <Button size="sm" variant="ghost" onClick={() => void remove()}>Remove</Button>
+      </span>
+    </li>
+  )
+}
+
+function SaveDayButton({ date, saved, hasFood }: { date: string; saved: boolean; hasFood: boolean }) {
   const toast = useToast()
   const queryClient = useQueryClient()
   const [pending, setPending] = useState(false)
@@ -229,22 +332,18 @@ function SaveDayCard({ date, saved, hasFood }: { date: string; saved: boolean; h
   }
 
   return (
-    <Card>
-      <h2 className="font-display text-xl font-medium">Save this day</h2>
-      <p className="mt-2 text-sm text-muted">Saved days are listed on Weekly. The API keeps a day after it has at least one food log.</p>
-      <Button className="mt-4" disabled={pending || saved || !hasFood} onClick={() => void save()}>
-        {saved ? "Day saved" : pending ? "Saving…" : "Save day"}
-      </Button>
-    </Card>
+    <Button variant="secondary" size="sm" disabled={pending || saved || !hasFood} onClick={() => void save()}>
+      {saved ? "Day saved" : pending ? "Saving…" : "Save day"}
+    </Button>
   )
 }
 
 function ExerciseCard({
   nutrition,
-  activities,
+  plain = false,
 }: {
   nutrition: Extract<NutritionGoals, { configured: true }>
-  activities: Array<{ id: number; activity: string; duration_minutes: number | null; calories_burned: number | null }>
+  plain?: boolean
 }) {
   const toast = useToast()
   const queryClient = useQueryClient()
@@ -273,51 +372,139 @@ function ExerciseCard({
     },
   })
 
-  async function remove(id: number) {
+  const formBody = ready ? (
+    <form className="space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} noValidate>
+      <Input label="Activity" error={form.formState.errors.activity?.message} {...form.register("activity")} />
+      <Select label="Type" options={activityTypes} error={form.formState.errors.activity_type?.message} {...form.register("activity_type")} />
+      <Input label="Minutes" inputMode="decimal" error={form.formState.errors.duration_minutes?.message} {...form.register("duration_minutes")} />
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" className="mt-1" {...form.register("extra")} />
+        <span>Count the active calories toward today's target. A fixed care-plan calorie number cannot take this credit.</span>
+      </label>
+      <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? "Saving…" : "Log exercise"}</Button>
+    </form>
+  ) : (
+    <p className="text-sm text-muted">Add height and weight in Settings before logging exercise.</p>
+  )
+  return plain ? formBody : <Card><h2 className="font-display text-xl font-medium">Exercise</h2>{formBody}</Card>
+}
+
+function ConditionsGroup({ settings }: { settings: HealthSettings }) {
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const [pending, setPending] = useState(false)
+  const [conditions, setConditions] = useState<HealthCondition[]>(settings.conditions)
+  const [trimester, setTrimester] = useState<1 | 2 | 3 | null>(settings.trimester)
+  const [adding, setAdding] = useState(false)
+  const selected = conditionChoices.filter((choice) => conditions.includes(choice.value))
+  const available = conditionChoices.filter((choice) => !conditions.includes(choice.value))
+
+  async function persist(nextConditions: HealthCondition[], nextTrimester: 1 | 2 | 3 | null) {
+    setConditions(nextConditions)
+    setTrimester(nextTrimester)
+    setPending(true)
     try {
-      await deleteActivityLog(id)
-      await queryClient.invalidateQueries({ queryKey: ["activity-logs"] })
+      const saved = await saveHealthSettings({
+        conditions: nextConditions,
+        trimester: nextConditions.includes("pregnancy") ? nextTrimester : null,
+        custom_calories: settings.custom_calories,
+        custom_carbs: settings.custom_carbs,
+        custom_protein: settings.custom_protein,
+        custom_fat: settings.custom_fat,
+        micronutrient_overrides: settings.micronutrient_overrides,
+      })
+      queryClient.setQueryData(["settings", "health"], saved)
       await queryClient.invalidateQueries({ queryKey: ["reports"] })
+      await queryClient.invalidateQueries({ queryKey: ["goals"] })
     } catch (error) {
-      toast.push(error instanceof ApiError ? error.message : "Exercise could not be removed.", "danger")
+      setConditions(settings.conditions)
+      setTrimester(settings.trimester)
+      toast.push(error instanceof ApiError ? error.message : "The condition could not be saved.", "danger")
+    } finally {
+      setPending(false)
     }
   }
 
+  function add(condition: HealthCondition) {
+    const next = new Set(conditions)
+    let nextTrimester = trimester
+    next.add(condition)
+    if (condition === "pregnancy") {
+      next.delete("menstruation")
+      nextTrimester = nextTrimester ?? 1
+    }
+    if (condition === "menstruation") {
+      next.delete("pregnancy")
+      nextTrimester = null
+    }
+    setAdding(false)
+    void persist([...next], nextTrimester)
+  }
+
+  function remove(condition: HealthCondition) {
+    const next = conditions.filter((item) => item !== condition)
+    void persist(next, condition === "pregnancy" ? null : trimester)
+  }
+
   return (
-    <Card>
-      <h2 className="font-display text-xl font-medium">Exercise</h2>
-      {ready ? (
-        <form className="mt-4 space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} noValidate>
-          <Input label="Activity" error={form.formState.errors.activity?.message} {...form.register("activity")} />
-          <Select label="Type" options={activityTypes} error={form.formState.errors.activity_type?.message} {...form.register("activity_type")} />
-          <Input label="Minutes" inputMode="decimal" error={form.formState.errors.duration_minutes?.message} {...form.register("duration_minutes")} />
-          <label className="flex items-start gap-3 text-sm">
-            <input type="checkbox" className="mt-1" {...form.register("extra")} />
-            <span>Count the active calories toward today's target. A fixed care-plan calorie number cannot take this credit.</span>
-          </label>
-          <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? "Saving…" : "Log exercise"}</Button>
-        </form>
-      ) : (
-        <p className="mt-2 text-sm text-muted">Add height and weight in Settings before logging exercise.</p>
-      )}
-      <ul className="mt-4 space-y-2">
-        {activities.map((log) => (
-          <li key={log.id} className="flex items-center justify-between gap-3 text-sm">
-            <span>{log.activity} · {log.duration_minutes ?? "—"} min{log.calories_burned == null ? "" : ` · ${formatKcal(log.calories_burned)}`}</span>
-            <Button size="sm" variant="ghost" onClick={() => void remove(log.id)}>Remove</Button>
+    <section>
+      <div className="flex items-center justify-between bg-canvas px-4 py-2">
+        <h2 className="text-sm font-semibold">Conditions</h2>
+        <span className="text-sm tabular-nums text-muted">{selected.length === 0 ? "" : selected.length}</span>
+      </div>
+      <ul>
+        {selected.map((choice) => (
+          <li key={choice.value} className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-line px-4 py-2 text-sm">
+            <span>
+              <span className="block font-semibold">{choice.label}</span>
+              <span className="text-muted">{choice.value === "pregnancy" ? `Trimester ${trimester ?? 1}` : choice.detail}</span>
+            </span>
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => remove(choice.value)}>Remove</Button>
           </li>
         ))}
+        {conditions.includes("pregnancy") ? (
+          <li className="border-t border-line px-4 py-3">
+            <Select
+              label="Pregnancy trimester"
+              value={String(trimester ?? 1)}
+              options={[{ value: "1", label: "First" }, { value: "2", label: "Second" }, { value: "3", label: "Third" }]}
+              onChange={(event) => void persist(conditions, Number(event.target.value) as 1 | 2 | 3)}
+            />
+          </li>
+        ) : null}
+        {adding ? available.map((choice) => (
+          <li key={choice.value} className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-line px-4 py-2 text-sm">
+            <span>
+              <span className="block font-semibold">{choice.label}</span>
+              <span className="text-muted">{choice.detail}</span>
+            </span>
+            <Button size="sm" disabled={pending} onClick={() => add(choice.value)}>Add</Button>
+          </li>
+        )) : null}
+        {adding && available.length === 0 ? <li className="border-t border-line px-4 py-2 text-sm text-muted">Every condition is already added.</li> : null}
       </ul>
-    </Card>
+      <button type="button" className="block px-4 py-2 text-sm font-semibold text-accent hover:underline" onClick={() => setAdding((current) => !current)}>
+        + Add condition
+      </button>
+    </section>
   )
 }
 
 function Micronutrients({ items }: { items: Array<{ name: string; unit: string; logged: number | null; target: number; percent: number | null; bar_width: number; limit: boolean; partial: boolean }> }) {
+  const [open, setOpen] = useState(false)
   if (items.length === 0) return null
   return (
-    <Card>
-      <details>
-        <summary className="cursor-pointer font-display text-xl font-medium">Micronutrients</summary>
+    <section className="rounded-2xl border border-line bg-card px-4 py-5">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 text-left"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <h2 className="font-display text-lg font-medium">Nutrient targets</h2>
+        <ChevronDown className={open ? "rotate-180" : undefined} />
+      </button>
+      {open ? (
         <div className="mt-4 space-y-4">
           {items.map((item) => (
             <ProgressBar
@@ -329,7 +516,15 @@ function Micronutrients({ items }: { items: Array<{ name: string; unit: string; 
             />
           ))}
         </div>
-      </details>
-    </Card>
+      ) : null}
+    </section>
+  )
+}
+
+function ChevronDown({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" className={`h-5 w-5 shrink-0 transition-transform ${className ?? ""}`}>
+      <path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }

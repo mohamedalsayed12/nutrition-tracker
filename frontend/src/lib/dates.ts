@@ -26,6 +26,17 @@ export function startOfWeek(isoDate: string): string {
   return addDays(isoDate, -mondayOffset)
 }
 
+export function formatDiaryDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number)
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1)))
+}
+
 export function formatDayLabel(isoDate: string): string {
   const [year, month, day] = isoDate.split("-").map(Number)
   return new Intl.DateTimeFormat("en-US", {

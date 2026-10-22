@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 from healthsciencecalculator.get_bmr import get_bmr
 from healthsciencecalculator.get_tdee import get_tdee
-from services.nutrient_targets import micronutrient_targets
+from services.nutrient_targets import apply_menstruation_targets, micronutrient_targets
 from services.weekly_recap import food_macros
 
 
@@ -53,6 +53,8 @@ def calculate_goal_targets(info, goal, pregnancy_active):
 def configured_micronutrients(age, sex, preferences):
     pregnant = preferences is not None and "pregnancy" in (preferences.conditions or [])
     targets = micronutrient_targets(age, sex, pregnant=pregnant)
+    if preferences is not None and "menstruation" in (preferences.conditions or []):
+        apply_menstruation_targets(targets, age)
     overrides = (preferences.micronutrient_overrides or {}) if preferences is not None else {}
     for target in targets:
         if target["name"] in overrides:

@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
-import { Navigate } from "react-router-dom"
+import { Navigate, useSearchParams } from "react-router-dom"
 import { ApiError } from "../api/client.ts"
 import { getFrequentFoods, getMeasures, searchFoods } from "../api/foods.ts"
 import { FoodScoreCard } from "../components/food/FoodScoreCard.tsx"
 import { Button } from "../components/ui/Button.tsx"
 import { Card } from "../components/ui/Card.tsx"
-import { EmptyState } from "../components/ui/EmptyState.tsx"
 import { Input } from "../components/ui/Input.tsx"
 import { Select } from "../components/ui/Select.tsx"
 import { Skeleton } from "../components/ui/Skeleton.tsx"
@@ -19,7 +18,10 @@ import type { FoodMeasure, FoodSummary, Meal } from "../types/api.ts"
 
 export function AddFoodPage() {
   const nutrition = useNutrition()
-  const [meal, setMeal] = useState<Meal>("breakfast")
+  const [params] = useSearchParams()
+  const requestedMeal = params.get("meal")
+  const [meal, setMeal] = useState<Meal>(mealOptions.some((item) => item.id === requestedMeal) ? requestedMeal as Meal : "breakfast")
+  const [finder, setFinder] = useState<"search" | "again">("search")
   const [query, setQuery] = useState("")
   const [debounced, setDebounced] = useState("")
   const [selected, setSelected] = useState<FoodSummary | null>(null)
@@ -44,58 +46,62 @@ export function AddFoodPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-3xl font-medium">Add food</h1>
+      <h1 className="font-display text-3xl font-medium">Foods</h1>
       <Tabs label="Meal" value={meal} onChange={(value) => setMeal(value as Meal)} tabs={mealOptions.map((item) => ({ id: item.id, label: item.label }))} />
-      <Card>
-        <h2 className="font-display text-xl font-medium">Often logged</h2>
-        {frequent.isLoading ? <Skeleton className="mt-4 h-16 w-full" /> : null}
-        {frequent.isError ? <p className="mt-3 text-sm text-danger">Frequent foods could not be loaded.</p> : null}
-        {!frequent.isLoading && frequentMeals.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">Foods you log for this meal will show up here.</p>
-        ) : (
+      <Tabs label="How to add a food" value={finder} onChange={(value) => setFinder(value as "search" | "again")} tabs={[{ id: "search", label: "Search" }, { id: "again", label: "Log again" }]} />
+      {finder === "search" ? (
+        <Card>
+          <Input label="Search foods" value={query} onChange={(event) => { setQuery(event.target.value); setSelected(null) }} placeholder="Chicken, banana, or an FDC id" />
+          {debounced.length > 0 && debounced.length < 2 ? <p className="mt-3 text-sm text-muted">Type at least 2 characters.</p> : null}
+          {search.isLoading ? <Skeleton className="mt-4 h-20 w-full" /> : null}
+          {search.isError ? (
+            <p className="mt-3 text-sm text-danger">{search.error instanceof ApiError ? search.error.message : "Food search failed."}</p>
+          ) : null}
+          {search.data && search.data.foods.length === 0 ? <p className="mt-3 text-sm text-muted">No foods matched that search.</p> : null}
           <ul className="mt-3 space-y-2">
-            {frequentMeals.map((food) => (
-              <li key={`${food.fdc_id}-${food.grams}`} className="flex items-center justify-between gap-3">
-                <span>
-                  <span className="block font-semibold">{food.description}</span>
-                  <span className="text-sm text-muted">{food.grams} g · logged {food.count} times</span>
-                </span>
-                <Button
-                  size="sm"
-                  disabled={logFood.isPending}
-                  onClick={() => logFood.mutate({ meal, fdc_id: food.fdc_id, grams: food.grams, food_name: food.description })}
+            {search.data?.foods.map((food) => (
+              <li key={food.fdc_id}>
+                <button
+                  type="button"
+                  className="w-full rounded-2xl border border-line px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  onClick={() => setSelected(food)}
                 >
-                  Log
-                </Button>
+                  <span className="block font-semibold">{food.description}</span>
+                  <span className="text-sm text-muted">{food.brand_name ? `${food.brand_name} · ` : ""}{food.data_type} · FDC {food.fdc_id}</span>
+                </button>
               </li>
             ))}
           </ul>
-        )}
-      </Card>
-      <Card>
-        <Input label="Search foods" value={query} onChange={(event) => { setQuery(event.target.value); setSelected(null) }} placeholder="Chicken, banana, or an FDC id" />
-        {debounced.length > 0 && debounced.length < 2 ? <p className="mt-3 text-sm text-muted">Type at least 2 characters.</p> : null}
-        {search.isLoading ? <Skeleton className="mt-4 h-20 w-full" /> : null}
-        {search.isError ? (
-          <p className="mt-3 text-sm text-danger">{search.error instanceof ApiError ? search.error.message : "Food search failed."}</p>
-        ) : null}
-        {search.data && search.data.foods.length === 0 ? <p className="mt-3 text-sm text-muted">No foods matched that search.</p> : null}
-        <ul className="mt-3 space-y-2">
-          {search.data?.foods.map((food) => (
-            <li key={food.fdc_id}>
-              <button
-                type="button"
-                className="w-full rounded-2xl border border-line px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                onClick={() => setSelected(food)}
-              >
-                <span className="block font-semibold">{food.description}</span>
-                <span className="text-sm text-muted">{food.brand_name ? `${food.brand_name} · ` : ""}{food.data_type} · FDC {food.fdc_id}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Card>
-      {selected ? (
+        </Card>
+      ) : (
+        <Card>
+          <h2 className="font-display text-xl font-medium">Log again</h2>
+          {frequent.isLoading ? <Skeleton className="mt-4 h-16 w-full" /> : null}
+          {frequent.isError ? <p className="mt-3 text-sm text-danger">Foods you have logged could not be loaded.</p> : null}
+          {!frequent.isLoading && frequentMeals.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">Foods you log for this meal will show up here.</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {frequentMeals.map((food) => (
+                <li key={`${food.fdc_id}-${food.grams}`} className="flex items-center justify-between gap-3">
+                  <span>
+                    <span className="block font-semibold">{food.description}</span>
+                    <span className="text-sm text-muted">{food.grams} g · logged {food.count} times</span>
+                  </span>
+                  <Button
+                    size="sm"
+                    disabled={logFood.isPending}
+                    onClick={() => logFood.mutate({ meal, fdc_id: food.fdc_id, grams: food.grams, food_name: food.description })}
+                  >
+                    Log
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {finder === "search" && selected ? (
         <ServingForm
           key={selected.fdc_id}
           food={selected}
@@ -103,9 +109,7 @@ export function AddFoodPage() {
           pending={logFood.isPending}
           onLog={(grams) => logFood.mutate({ meal, fdc_id: selected.fdc_id, grams, food_name: selected.description }, { onSuccess: () => setSelected(null) })}
         />
-      ) : (
-        <EmptyState title="Choose a food" body="Search USDA, then pick a serving. The score card is a preview until that API exists." />
-      )}
+      ) : null}
     </div>
   )
 }
