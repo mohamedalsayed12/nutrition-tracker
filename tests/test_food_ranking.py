@@ -161,3 +161,9 @@ def test_identical_branded_names_are_shown_once():
     foods = [food(91, "RICE", "Branded", "Store A"), food(92, "RICE", "Branded", "Store A"),
              food(93, "RICE", "Branded", "Store B"), food(94, "Rice, cooked, NFS", "Survey (FNDDS)")]
     assert ids(rank_foods(foods, "rice")) == [94, 91, 93]
+
+
+def test_white_rice_before_other_raw_rices():
+    foods = [food(61, "Rice, black, unenriched, raw"), food(62, "Rice, white, medium-grain, raw, enriched"),
+             food(63, "Rice, brown, long-grain, raw"), food(64, "Rice, cooked, NFS", "Survey (FNDDS)")]
+    assert ids(rank_foods(foods, "rice"))[0] == 62

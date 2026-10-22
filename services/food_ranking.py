@@ -101,7 +101,9 @@ def rank_key(food, query_words, raw_first=False):
     unusual = sum(1 for word in food_words - asked if word in UNUSUAL)
     processed = sum(1 for word in food_words - asked if word in PROCESSED)
     processed += 1 if (food_words - asked) & MIXED_DISH else 0
-    everyday = max((EVERYDAY.get(word, 0) for word in food_words - asked), default=0)
+    # Added up, so "white" and "raw" together beat "raw" alone ("Rice, white, raw"
+    # before "Rice, black, raw").
+    everyday = sum(EVERYDAY.get(word, 0) for word in food_words - asked)
     extra_words = len(food_words - asked - FILLER)
     # In the search box raw foods come first ("Rice, white, raw" before "Rice,
     # cooked"); Siri keeps the everyday order, since "a cup of rice" means cooked.
