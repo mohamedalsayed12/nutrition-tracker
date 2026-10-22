@@ -147,6 +147,6 @@ def remaining_targets(food_logs, targets):
         percent = round(totals[name] / item["target"] * 100, 1) if known and item["target"] > 0 else None
         rows.append({"name": name, "unit": item["unit"], "target": item["target"], "limit": limit,
                      "logged": logged, "remaining": round(max(item["target"] - totals[name], 0), 2) if known else None,
-                     "percent": percent,
+                     "percent": percent, "bar_width": min(percent, 100) if percent is not None else 0,
                      "partial": 0 < reported[name] < len(food_logs)})
     return rows

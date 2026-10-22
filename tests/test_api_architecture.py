@@ -14,11 +14,41 @@ def setup_nutrition(client, headers):
     assert response.status_code == 200
 
 
-@pytest.mark.parametrize("path", ["/login", "/register", "/homepage", "/UserInfo", "/static/example.css"])
-def test_frontend_routes_are_removed(client, path):
-    response = client.get(path)
-    assert response.status_code == 404
-    assert response.is_json
+def _csrf(page):
+    import re
+    match = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', page.decode())
+    if match is None:
+        match = re.search(r'value="([^"]+)"[^>]*name="csrf_token"', page.decode())
+    assert match, page.decode()
+    return match.group(1)
+
+
+def test_browser_pages_are_available(client):
+    login = client.get("/login")
+    assert login.status_code == 200
+    assert b"Login" in login.data
+    register = client.get("/register")
+    assert register.status_code == 200
+    assert b"REGISTER NOW" in register.data
+    homepage = client.get("/homepage")
+    assert homepage.status_code == 302
+    assert "/login" in homepage.headers["Location"]
+    missing = client.get("/static/example.css")
+    assert missing.status_code == 404
+    assert missing.is_json
+
+    created = client.post("/register", data={
+        "csrf_token": _csrf(register.data), "name": "Page User",
+        "email": "page@example.com", "password": "a-secure-password",
+    })
+    assert created.status_code == 302
+    signed_in = client.post("/login", data={
+        "csrf_token": _csrf(client.get("/login").data),
+        "email": "page@example.com", "password": "a-secure-password",
+    }, follow_redirects=True)
+    assert b"Meals Log" in signed_in.data
+    assert client.get("/UserInfo").status_code == 200
+    assert client.get("/weekly-recap").status_code == 200
 
 
 @pytest.mark.parametrize("payload", [

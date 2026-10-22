@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - My Calorie Tracker{% endblock %}
+{% block content %}
+
+
+<style>
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #000000, #000000, rgb(246 0 0));
+    color: white;
+    margin: 0;
+    padding: 0;
+}
+
+h1 {
+    text-align: center;
+    color: white;
+}
+
+.form-container, .result-container {
+
+    max-width: 800px;
+    margin: 50px auto;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 16px rgb(255 255 255 / 0.2);
+    border-radius: 12px;
+}
+
+label {
+
+    color: white;
+    display: block;
+    margin: 10px 0;
+    font-weight: bold;
+}
+
+input[type="number"], button {
+
+    margin: 10px 0;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 8px;
+    border: none;
+}
+
+input[type="number"] {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    outline: none;
+}
+
+input[type="number"]:focus {
+    border: 2px solid #ffcc70;
+}
+ input[type="radio"] {
+    accent-color: #ff3b3b;
+    margin-right: 5px;
+}
+
+button {
+    background: linear-gradient(90deg, #ff8c00, #ff3b3b);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: linear-gradient(90deg, #ff3b3b, #ff8c00);
+}
+
+.radio-group {
+    margin-bottom: 30px;
+}
+
+.radio-group label {
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.result-container a {
+    display: inline-block;
+    text-align: center;
+    color:rgb(27, 27, 236);
+    text-decoration: none;
+    margin-top: 20px;
+}
+
+.result-container a:hover {
+    text-decoration: underline;
+}
+
+
+@media (max-width: 600px) {
+    .form-container, .result-container {
+        padding: 15px;
+        margin: 20px;
+    }
+
+    button {
+        padding: 12px;
+    }
+}
+
+</style>
+
+
+<body>
+    <div class="form-container">
+        <h1>Calculate Your Daily Calorie Needs</h1>
+        <form method="POST">
+            <label for="weight">Weight (kg):</label>
+            <input type="number" id="weight" name="weight" required>
+
+            <label for="height">Height (cm):</label>
+            <input type="number" id="height" name="height" required>
+
+            <label for="age">Age:</label>
+            <input type="number" id="age" name="age" required><br><br>
+
+            <div class="radio-group">
+                <label>Gender:</label>
+
+                <label>
+                    <input type="radio" name="gender" value="male" required> Male
+                </label>
+                <label>
+                    <input type="radio" name="gender" value="female" required> Female
+                </label>
+            </div><br><br>
+
+            <div class="radio-group">
+                <label>Activity Level:</label>
+                <p>Choose your usual activity, including your normal workouts. You can mark an additional workout as extra when logging it.</p>
+                <label>
+                    <input type="radio" name="activity_level" value="sedentary" required> Sedentary
+                </label>
+                <label>
+                    <input type="radio" name="activity_level" value="lightly active" required> Lightly Active
+                </label>
+                <label>
+                    <input type="radio" name="activity_level" value="moderately active" required> Moderately Active
+                </label>
+
+                <label>
+                    <input type="radio" name="activity_level" value="very active" required> Very Active
+                </label>
+                <label>
+                    <input type="radio" name="activity_level" value="extra active" required> Extra Active
+                </label>
+
+            </div><br><br>
+
+            <div class="radio-group">
+                <label>Goal:</label>
+                <label>
+                    <input type="radio" name="goal" value="maintain" required> Maintain
+                </label>
+                <label>
+                    <input type="radio" name="goal" value="lose_weight" required> Lose Weight
+                </label>
+                <label>
+                    <input type="radio" name="goal" value="gain_weight" required> Gain Weight
+                </label>
+            </div>
+
+            <button type="submit">Calculate</button>
+        </form>
+    </div>
+
+
+    {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+    {% if calories_for_goal is not none %}
+    <div class="result-container">
+        <h1>Your Results</h1>
+        <center>
+            <h2>Your BMR: {{ bmr }} kcal/day</h2>
+            <h2>Your TDEE: {{ tdee }} kcal/day</h2>
+            <h2>{% if pregnancy_active %}Baseline calorie estimate{% else %}Calories for your goal{% endif %}: {{ calories_for_goal }} kcal/day</h2>
+            {% if custom_macros %}
+            <h2>Estimated protein: {{ custom_macros.protein }} g/day{% if custom_macros.protein_overridden %} (personal amount){% endif %}</h2>
+            <h2>Estimated carbohydrates: {{ custom_macros.carbs }} g/day{% if custom_macros.carbs_overridden %} (personal amount){% endif %}</h2>
+            <h2>Estimated fat: {{ custom_macros.fat }} g/day{% if custom_macros.fat_overridden %} (personal amount){% endif %}</h2>
+            {% else %}
+            <h2>Estimated protein range: {{protein_min}} to {{protein_max}} g/day</h2>
+            <h2>Estimated carbohydrates: {{carbs}} g/day</h2>
+            {% if fat_range %}<h2>Estimated fat range: {{ fat_range[0] }} to {{ fat_range[1] }} g/day</h2>{% endif %}
+            {% endif %}
+            <a href="{{ url_for('home_page') }}">Go back</a>
+            <a href="{{ url_for('macro_split_settings') }}">Choose your macro split</a>
+            <a href="{{ url_for('health_settings') }}">Medical condition setting</a>
+        </center>
+
+    </div>
+    {% with target_age=values.get('age'), target_sex=values.get('gender'), pregnant=pregnancy_active %}
+      {% include '_micronutrient_targets.html' %}
+    {% endwith %}
+    {% endif %}
+
+    {% endblock %}

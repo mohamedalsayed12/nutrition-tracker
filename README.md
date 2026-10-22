@@ -2,7 +2,7 @@
 
 I'm building this nutrition tracker so people can log food and activity, set goals, and see how a day or week compares with those goals. I kept the backend separate so I can add a web or mobile app later without rebuilding the calculations.
 
-The backend uses Flask, PostgreSQL, and SQLAlchemy. For now it's an API, with no frontend or browser login; clients sign in with JWT access tokens.
+The backend uses Flask, PostgreSQL, and SQLAlchemy. It has server-rendered pages for login, registration, the meals log, targets and health settings (session login), plus a React frontend in `frontend/`. API clients sign in with JWT access tokens.
 
 ## What I've built so far
 
@@ -12,7 +12,7 @@ The backend uses Flask, PostgreSQL, and SQLAlchemy. For now it's an API, with no
 - Daily reports, weekly recaps, saved days, and frequently logged foods.
 - PostgreSQL migrations, Docker setup, OpenAPI documentation, and automated tests.
 
-Food search needs a USDA API key, and exercise search needs an API Ninjas key. I'm still working on the frontend and hosted deployment.
+Food search needs a USDA API key, and exercise search needs an API Ninjas key. Open `/login` for the meals log. I'm still working on hosted deployment.
 
 ## How I organised it
 

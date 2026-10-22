@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Public Sans", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --color-canvas: #f3f5f1;
+  --color-card: #ffffff;
+  --color-ink: #1c211c;
+  --color-muted: #5d675e;
+  --color-line: #e2e7e1;
+  --color-accent: #1b7a43;
+  --color-accent-soft: #e6f5eb;
+  --color-amber: #a16207;
+  --color-danger: #c2413a;
+}
+
+.dark {
+  --color-canvas: #121412;
+  --color-card: #1c201c;
+  --color-ink: #f4f6f2;
+  --color-muted: #a7b0a6;
+  --color-line: #2d332d;
+  --color-accent: #3cba72;
+  --color-accent-soft: #173222;
+  --color-amber: #f5b942;
+  --color-danger: #f07167;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+@media (max-width: 1023px) {
+  main :is(button, a, input, select, summary) {
+    scroll-margin-bottom: 5.5rem;
+  }
+}
+
+dialog {
+  margin: auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+dialog::backdrop {
+  background: rgb(18 20 18 / 0.45);
+}
+
+dialog.sheet {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  height: fit-content;
+  align-self: end;
+}

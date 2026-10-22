@@ -1,13 +1,19 @@
 from datetime import datetime, timezone
+
+from flask_login import UserMixin
+
 from database import db
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
     uid = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String, nullable=False)
     email = db.Column(db.String, unique=True, nullable=False)
     password = db.Column(db.String, nullable=False)
+
+    def get_id(self):
+        return str(self.uid)
 
     def __repr__(self):
         return f'<User: {self.username}>'

@@ -1,4 +1,5 @@
 import re
+from datetime import timezone
 from decimal import Decimal, InvalidOperation
 
 from healthsciencecalculator.get_bmr import get_bmr
@@ -326,12 +327,12 @@ def daily_target_progress(today_food_logs, daily_calorie_target, exercise_credit
                                         for name, key in (("Protein", "protein"), ("Carbohydrates", "carbs"), ("Fat", "fat")))
             else:
                 protein_label = (f"{protein_max} g" if getattr(preferences, "custom_protein", None) is not None
-                                 else f"{protein_min}Ã¢â‚¬â€œ{protein_max} g")
+                                 else f"{protein_min}–{protein_max} g")
                 progress_targets.extend((("Protein", protein_max, protein_label),
                                          ("Carbohydrates", carbs_target, f"{carbs_target} g")))
                 if fat_range:
                     fat_label = (f"{fat_range[1]} g" if getattr(preferences, "custom_fat", None) is not None
-                                 else f"{fat_range[0]}Ã¢â‚¬â€œ{fat_range[1]} g")
+                                 else f"{fat_range[0]}–{fat_range[1]} g")
                     progress_targets.append(("Fat", fat_range[1], fat_label))
         for name, goal, target_label in progress_targets:
             reported = counts[name]
@@ -351,8 +352,44 @@ def daily_target_progress(today_food_logs, daily_calorie_target, exercise_credit
                     note = " (care-plan amount)"
             progress.append({"name": name, "logged": logged, "target_label": target_label,
                              "unit": "kcal" if name == "Calories" else "g", "percent": percent,
+                             "bar_width": min(percent, 100) if percent is not None else 0,
                              "partial": 0 < reported < len(today_food_logs), "note": note})
     return progress, fat_range, custom_macros, protein_min, protein_max, carbs_target
+
+
+def _as_utc(value):
+    return value.replace(tzinfo=value.tzinfo or timezone.utc).astimezone(timezone.utc)
+
+
+def exercise_adjusted_target(target, activity_logs, today, activity_baseline, fixed_care_plan_target):
+    credit = 0
+    if target is not None and activity_baseline is not None and not fixed_care_plan_target:
+        changed_at = _as_utc(activity_baseline.changed_at)
+        credit = round(sum(
+            log.target_credit.active_calories for log in activity_logs
+            if getattr(log, "local_date", None) == today and log.target_credit is not None
+            and log.target_credit.extra and _as_utc(log.logged_at) >= changed_at
+        ), 1)
+    calories = round(target.calories + credit, 1) if target is not None else None
+    return credit, calories
+
+
+def weekly_target_labels(calories, nutrition, split, preferences):
+    custom = custom_macro_targets(calories, split, preferences)
+    fat_range = fat_target_range(calories, nutrition.age) if calories is not None and nutrition is not None else None
+    protein_override = getattr(preferences, "custom_protein", None)
+    fat_override = getattr(preferences, "custom_fat", None)
+    return {
+        "Calories": f"{calories} kcal" if calories is not None else "Not set",
+        "Protein": (f"{custom['protein']} g" if custom else
+                    f"{protein_override} g" if protein_override is not None else
+                    f"{nutrition.protein_min}–{nutrition.protein_max} g" if nutrition else "Not set"),
+        "Carbohydrates": (f"{custom['carbs']} g" if custom else
+                          f"{nutrition.carbs} g" if nutrition else "Not set"),
+        "Fat": (f"{custom['fat']} g" if custom else
+                f"{fat_override} g" if fat_override is not None else
+                f"{fat_range[0]}–{fat_range[1]} g" if fat_range else "Not set"),
+    }
 
 
 def condition_nutrition_data(today_food_logs, daily_calories):
