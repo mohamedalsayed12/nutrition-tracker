@@ -1,20 +1,42 @@
+import logging
 import os
 import re
 
 import requests
 from flask import abort
 from usda_fdc import FdcClient, FdcResourceNotFoundError
+from usda_fdc.models import SearchResult
 
 from database import db
 from models import FoodLog
 from services.food_ranking import rank_foods, words
+
+logger = logging.getLogger(__name__)
+
+
+class FoodClient(FdcClient):
+    """The USDA client, sending searches that filter by data type as POST.
+
+    USDA's server rejects some GET searches that filter by data type (an nginx
+    400 for queries such as "apple"), while the same search sent as a POST with
+    a JSON body works, so filtered searches use POST.
+    """
+
+    def search(self, query, data_type=None, page_size=50, page_number=1, **kwargs):
+        if not data_type:
+            return super().search(query, page_size=page_size, page_number=page_number, **kwargs)
+        data = self._make_request("foods/search", method="POST", data={
+            "query": query, "dataType": list(data_type),
+            "pageSize": page_size, "pageNumber": page_number,
+        })
+        return SearchResult.from_api_data(data)
 
 
 def get_food_client():
     api_key = os.getenv("FDC_API_KEY")
     if not api_key:
         raise ValueError("Food search is not configured.")
-    return FdcClient(api_key)
+    return FoodClient(api_key)
 
 
 GENERIC_TYPES = ["Foundation", "SR Legacy", "Survey (FNDDS)"]
@@ -33,16 +55,24 @@ def _find_foods(client, query):
                 if (food.gtin_upc or "").lstrip("0") == query.lstrip("0")][:20]
 
     # Generic and branded foods are fetched separately so the thousands of branded
-    # products cannot crowd everyday foods out of the results.
-    generic = client.search(query, data_type=GENERIC_TYPES, page_size=100).foods
-    branded = client.search(query, data_type=["Branded"], page_size=50).foods
-    ranked = rank_foods(list(generic) + list(branded), query)
+    # products cannot crowd everyday foods out of the results. If USDA rejects the
+    # filtered searches, fall back to one unfiltered search rather than failing.
+    try:
+        generic = list(client.search(query, data_type=GENERIC_TYPES, page_size=100).foods)
+        branded = list(client.search(query, data_type=["Branded"], page_size=50).foods)
+    except Exception:
+        logger.warning("Filtered USDA search failed; using an unfiltered search", exc_info=True)
+        generic, branded = list(client.search(query, page_size=100).foods), []
+    ranked = rank_foods(generic + branded, query)
     query_words = words(query)
     if len(query_words) > 1 and sum(food.data_type != "Branded" for food in ranked) < 5:
         # A multi-word search can miss foods USDA indexes differently, so widen
-        # the generic search to the first word and keep only full matches.
-        broader = client.search(query_words[0], data_type=GENERIC_TYPES, page_size=100).foods
-        ranked = rank_foods(list(generic) + list(broader) + list(branded), query)
+        # the search to the first word and keep only full matches.
+        try:
+            broader = list(client.search(query_words[0], data_type=GENERIC_TYPES, page_size=100).foods)
+        except Exception:
+            broader = list(client.search(query_words[0], page_size=100).foods)
+        ranked = rank_foods(generic + broader + branded, query)
     return ranked
 
 
