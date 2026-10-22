@@ -290,6 +290,18 @@ export type DailyReport = {
     fiber_percent: number | null
     fiber_partial: boolean
   }
+  iron_absorption: IronAbsorptionCheck[]
+}
+
+/** One meal with a meaningful amount of iron, and whether it has vitamin C to help absorb it. */
+export type IronAbsorptionCheck = {
+  meal: "breakfast" | "lunch" | "dinner" | "snack"
+  iron_mg: number
+  vitamin_c_mg: number | null
+  status: "add_vitamin_c" | "good"
+  tip: string
+  /** True when periods are selected, so the tip is shown more prominently. */
+  highlight: boolean
 }
 
 export type WeeklyReport = {

@@ -10,6 +10,7 @@ The backend uses Flask, PostgreSQL, and SQLAlchemy. It has server-rendered pages
 - Food lookup through USDA FoodData Central, with nutrients calculated on the server.
 - Calorie and nutrient targets, macro split settings, and health preferences.
 - Daily reports, weekly recaps, saved days, and frequently logged foods.
+- A per-meal iron check: vitamin C only helps iron absorption when it is eaten in the same meal, so the daily report flags meals with iron but little vitamin C and suggests what to add (shown more prominently when periods are selected).
 - PostgreSQL migrations, Docker setup, OpenAPI documentation, and automated tests.
 
 Food search needs a USDA API key, and exercise search needs an API Ninjas key. Open `/login` for the meals log. The API runs on Heroku and stores records in Heroku Postgres.

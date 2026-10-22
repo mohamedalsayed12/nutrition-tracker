@@ -5,6 +5,7 @@ from database import db
 from models import ActivityLog, CalorieTarget, FoodLog, HealthPreferences, MacroSplit, NutritionTargets, UserActivityBaseline
 from services.calc import (condition_nutrition_data, configured_micronutrients,
                            daily_target_progress, frequent_food_choices)
+from services.iron_absorption import iron_absorption_checks
 from services.nutrient_scoring import remaining_targets
 from services.weekly_recap import build_weekly_recap, food_macros
 from services.logs import iso_utc
@@ -55,7 +56,9 @@ def daily_report(user_id, day, zone):
                 calorie_goal=calories, exercise_credit=credit, progress=progress, fat_range=fat_range,
                 custom_macros=custom_macros, protein_min=protein_min, protein_max=protein_max, carbs=carbs,
                 micronutrients=remaining_targets(foods, micronutrients),
-                condition_nutrition=condition_nutrition_data(foods, calories))
+                condition_nutrition=condition_nutrition_data(foods, calories),
+                iron_absorption=iron_absorption_checks(
+                    foods, preferences.conditions if preferences is not None else ()))
 
 
 def weekly_report(user_id, week_start, zone):

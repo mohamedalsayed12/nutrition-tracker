@@ -72,25 +72,28 @@ CONDITION_MICRONUTRIENTS = {
     "menstruation": {
         "label": "Periods / menstruation",
         "source": "https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/",
-        "summary": "Periods raise the iron target to the menstrual reference when that is higher: 15 mg/day at ages 14–18 and 18 mg/day from age 19. Vitamin C is raised to 75 mg under 19 and 90 mg after that, because vitamin C helps the body absorb iron from plant foods. Heavy bleeding still needs clinical assessment.",
+        "summary": "Periods raise the iron target to the menstrual reference when that is higher: 15 mg/day at ages 14–18 and 18 mg/day from age 19. Vitamin C keeps its usual target (65 mg/day at ages 14–18, 75 mg/day for adult women). What helps iron absorption is eating vitamin C in the same meal as iron from plant foods, so the daily report checks each meal and suggests when to add some. Heavy bleeding still needs clinical assessment.",
         "nutrients": {
             "Iron": "Menstrual bleeding increases iron losses, so the target uses the menstrual reference when that is higher than the usual age and sex value.",
-            "Vitamin C": "Vitamin C helps the body absorb iron from plant foods, so the target is raised while periods are selected.",
+            "Vitamin C": "Vitamin C in the same meal helps the body absorb iron from plant foods such as beans, lentils, spinach and fortified cereals. Its daily target stays the same; the meal check shows where to add it.",
         },
     },
 }
 
 
 def apply_menstruation_targets(targets, age):
+    """Raise iron to the menstrual reference (NIH ODS) when that is higher.
+
+    Vitamin C is deliberately left at its usual target: no reference raises it
+    for menstruation. Its benefit for iron comes from eating it in the same meal,
+    which services/iron_absorption.py checks per meal.
+    """
     if age < 14:
         return targets
     iron = 15 if age <= 18 else 18
-    vitamin_c = 75 if age <= 18 else 90
     for target in targets:
         if target["name"] == "Iron":
             target["target"] = max(target["target"], iron)
-        elif target["name"] == "Vitamin C":
-            target["target"] = max(target["target"], vitamin_c)
     return targets
 
 

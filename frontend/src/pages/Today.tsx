@@ -24,7 +24,7 @@ import { formatGrams, formatKcal } from "../lib/format.ts"
 import { macroGramTargets } from "../lib/macroSplit.ts"
 import { mealOptions } from "../lib/meals.ts"
 import { intakeTone } from "../lib/progressTone.ts"
-import type { ActivityType, FoodLog, HealthCondition, HealthSettings, NutritionGoals } from "../types/api.ts"
+import type { ActivityType, FoodLog, HealthCondition, HealthSettings, IronAbsorptionCheck, NutritionGoals } from "../types/api.ts"
 
 const conditionChoices: Array<{ value: HealthCondition; label: string; detail: string }> = [
   { value: "pregnancy", label: "Pregnant", detail: "Uses pregnancy reference targets. Periods cannot be selected at the same time." },
@@ -169,6 +169,7 @@ export function TodayPage() {
         {logs.isLoading ? <Skeleton className="m-4 h-24" /> : mealOptions.map((meal) => {
           const items = dayLogs.filter((log) => log.meal === meal.id)
           const subtotal = items.reduce((sum, log) => sum + (foodKcal(log) ?? 0), 0)
+          const ironCheck = report.data?.iron_absorption?.find((check) => check.meal === meal.id)
           return (
             <DiaryGroup
               key={meal.id}
@@ -176,6 +177,7 @@ export function TodayPage() {
               subtotal={items.length === 0 ? "" : formatKcal(subtotal)}
               addTo={`/add?meal=${meal.id}`}
               addLabel="Add Food"
+              ironCheck={ironCheck}
             >
               {items.map((log) => <FoodRow key={log.id} log={log} />)}
             </DiaryGroup>
@@ -215,7 +217,7 @@ function EnergyCircle({ label, value, max, tone }: { label: string; value: numbe
   )
 }
 
-function DiaryGroup({ title, subtotal, addTo, addLabel, children }: { title: string; subtotal: string; addTo: string; addLabel: string; children: ReactNode }) {
+function DiaryGroup({ title, subtotal, addTo, addLabel, ironCheck, children }: { title: string; subtotal: string; addTo: string; addLabel: string; ironCheck?: IronAbsorptionCheck; children: ReactNode }) {
   return (
     <section className="border-b border-line">
       <div className="flex items-center justify-between bg-canvas px-4 py-2">
@@ -223,8 +225,26 @@ function DiaryGroup({ title, subtotal, addTo, addLabel, children }: { title: str
         <span className="text-sm tabular-nums text-muted">{subtotal}</span>
       </div>
       <ul>{children}</ul>
+      {ironCheck ? <IronTip check={ironCheck} /> : null}
       <Link className="block px-4 py-2 text-sm font-semibold text-accent hover:underline" to={addTo}>+ {addLabel}</Link>
     </section>
+  )
+}
+
+/**
+ * Shows when a meal has iron but little vitamin C. Vitamin C only helps iron
+ * absorption when it is eaten in the same meal, so this is checked per meal.
+ * A meal that already pairs them is only mentioned when periods are selected.
+ */
+function IronTip({ check }: { check: IronAbsorptionCheck }) {
+  if (check.status === "good" && !check.highlight) return null
+  const needsVitaminC = check.status === "add_vitamin_c"
+  const colour = needsVitaminC ? (check.highlight ? "text-amber font-semibold" : "text-amber") : "text-accent"
+  return (
+    <p role="note" className={`mx-4 mb-2 rounded-lg bg-canvas px-3 py-2 text-sm ${colour}`}>
+      <span className="font-semibold">{needsVitaminC ? "Iron tip: " : "Iron + vitamin C: "}</span>
+      {check.tip}
+    </p>
   )
 }
 
