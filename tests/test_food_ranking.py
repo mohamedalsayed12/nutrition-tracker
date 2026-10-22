@@ -110,3 +110,23 @@ def test_liquids_get_volume_units_and_plain_foods_default_to_100_g():
     assert "volume:ml" in codes and "volume:cup" not in codes
     plain = food_measures(SimpleNamespace(food_portions=[]))
     assert [item["code"] for item in plain if item["default"]] == ["100g"]
+
+
+# Real USDA results for "rice" (generic part), in the order USDA returned them.
+RICE = [food(51, "Rice, fried, NFS", "Survey (FNDDS)"), food(52, "Rice, cooked, NFS", "Survey (FNDDS)"),
+        food(53, "Rice, cooked, with milk", "Survey (FNDDS)"),
+        food(54, "Rice, white, cooked, glutinous", "Survey (FNDDS)"),
+        food(55, "Rice, sweet, cooked with honey", "Survey (FNDDS)"),
+        food(56, "Rice, cooked with coconut milk", "Survey (FNDDS)"),
+        food(57, "Rice, fried, with chicken", "Survey (FNDDS)"),
+        food(58, "Rice, white, long-grain, regular, enriched, cooked"),
+        food(59, "Rice noodles, cooked", "Survey (FNDDS)"), food(60, "Rice milk", "Survey (FNDDS)")]
+
+
+def test_plain_cooked_rice_comes_before_fried_rice_and_rice_dishes():
+    ranked = ids(rank_foods(RICE, "rice"))
+    assert ranked[0] == 52                      # "Rice, cooked, NFS"
+    assert ranked.index(54) < ranked.index(51)  # white rice before fried rice
+    assert ranked.index(58) < ranked.index(56)  # plain long-grain before rice with coconut milk
+    assert ranked.index(51) < ranked.index(57)  # fried rice before fried rice with chicken
+    assert ranked[-2:] == [59, 60]              # rice noodles and rice milk last

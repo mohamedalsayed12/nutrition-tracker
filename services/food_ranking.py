@@ -30,13 +30,18 @@ UNUSUAL = {
 PROCESSED = {
     "canned", "dried", "dehydrated", "frozen", "juice", "sauce", "breaded", "coated", "glazed",
     "sweetened", "syrup", "powder", "concentrate", "malted", "evaporated", "condensed",
-    "pickled", "smoked", "spread", "mix", "prepared", "fat-free", "nonfat", "light",
+    "pickled", "smoked", "spread", "mix", "prepared", "fat-free", "nonfat", "light", "fried",
 }
+# Small words that don't make a name more specific, so they are not counted as
+# extra words. "with" and "and" do mark a mixed dish ("Rice, cooked with milk"),
+# which counts as a processed variant instead.
+FILLER = {"with", "and", "or", "as", "to", "from", "of", "in", "the", "a", "ns", "nfs", "made", "type"}
+MIXED_DISH = {"with", "and"}
 # Words that describe the plain, everyday version of a food. "Raw", "whole" and
 # "plain" are the most typical choice; a cooking method or "NFS" (not further
 # specified) is a good generic match but slightly less so.
 EVERYDAY = {"raw": 2, "whole": 2, "plain": 2, "fresh": 2,
-            "cooked": 1, "boiled": 1, "baked": 1, "roasted": 1, "nfs": 1}
+            "cooked": 1, "boiled": 1, "baked": 1, "roasted": 1, "nfs": 1, "white": 1}
 
 DATA_TYPE_ORDER = {"SR Legacy": 0, "Foundation": 1, "Survey (FNDDS)": 2, "Branded": 3}
 
@@ -86,8 +91,9 @@ def rank_key(food, query_words):
     asked = set(query_words)
     unusual = sum(1 for word in food_words - asked if word in UNUSUAL)
     processed = sum(1 for word in food_words - asked if word in PROCESSED)
+    processed += 1 if (food_words - asked) & MIXED_DISH else 0
     everyday = max((EVERYDAY.get(word, 0) for word in food_words - asked), default=0)
-    extra_words = len(food_words - asked)
+    extra_words = len(food_words - asked - FILLER)
     return (
         _match_tier(description, query_words),
         2 * unusual + processed,
