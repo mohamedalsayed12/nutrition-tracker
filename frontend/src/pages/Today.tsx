@@ -514,7 +514,7 @@ type MicronutrientItem = { name: string; unit: string; logged: number | null; ta
 
 // The ones most people are short of (or over, for sodium), shown when the section is opened.
 const KEY_NUTRIENTS = ["Vitamin D", "Vitamin C", "Vitamin B12", "Iron", "Calcium", "Magnesium", "Potassium", "Sodium"]
-const VITAMIN_PREFIXES = ["Vitamin", "Thiamin", "Riboflavin", "Niacin", "Pantothenic", "Biotin", "Folate", "Choline"]
+const VITAMIN_PREFIXES = ["Vitamin", "Thiamin", "Riboflavin", "Niacin", "Pantothenic", "Folate", "Choline"]
 const MICRO_VIEW_KEY = "nutrition.micronutrients_view"
 type MicroView = "closed" | "key" | "all"
 

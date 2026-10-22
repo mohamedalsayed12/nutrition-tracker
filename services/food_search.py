@@ -1,6 +1,10 @@
 import logging
 import os
 import re
+import threading
+import time
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from flask import abort
@@ -23,6 +27,10 @@ class FoodClient(FdcClient):
     """
 
     def search(self, query, data_type=None, page_size=50, page_number=1, **kwargs):
+        key = ("search", query.lower().strip(), tuple(data_type or ()), page_size, page_number)
+        return _cache.get_or_set(key, lambda: self._search(query, data_type, page_size, page_number, **kwargs))
+
+    def _search(self, query, data_type, page_size, page_number, **kwargs):
         if not data_type:
             return super().search(query, page_size=page_size, page_number=page_number, **kwargs)
         data = self._make_request("foods/search", method="POST", data={
@@ -30,6 +38,47 @@ class FoodClient(FdcClient):
             "pageSize": page_size, "pageNumber": page_number,
         })
         return SearchResult.from_api_data(data)
+
+    def get_food(self, fdc_id, *args, **kwargs):
+        return _cache.get_or_set(("food", int(fdc_id)), lambda: super(FoodClient, self).get_food(fdc_id, *args, **kwargs))
+
+
+class _TtlCache:
+    """A small in-memory cache for USDA answers.
+
+    USDA's data changes a few times a year, so repeating a search or opening the
+    same food again within hours is served from memory instead of a second
+    round trip (each one takes 0.5-1 s). Failures are not cached.
+    """
+
+    def __init__(self, max_items=3000, ttl_seconds=12 * 3600):
+        self.max_items, self.ttl = max_items, ttl_seconds
+        self.items = OrderedDict()
+        self.lock = threading.Lock()
+
+    def get_or_set(self, key, compute):
+        now = time.monotonic()
+        with self.lock:
+            hit = self.items.get(key)
+            if hit is not None and now - hit[0] < self.ttl:
+                self.items.move_to_end(key)
+                return hit[1]
+        value = compute()
+        with self.lock:
+            self.items[key] = (now, value)
+            self.items.move_to_end(key)
+            while len(self.items) > self.max_items:
+                self.items.popitem(last=False)
+        return value
+
+    def clear(self):
+        with self.lock:
+            self.items.clear()
+
+
+_cache = _TtlCache()
+# The three searches for one query (lab-analysed, survey, branded) run at the same time.
+_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="usda")
 
 
 def get_food_client():
@@ -83,10 +132,10 @@ def _find_foods(client, query, raw_first=True):
         # Lab-analysed foods (SR Legacy, Foundation) are fetched on their own: they
         # hold the plain raw entries ("Rice, white, long-grain, raw"), which USDA's
         # relevance order otherwise pushes behind dozens of Survey dishes.
-        analysed = list(client.search(query, data_type=["SR Legacy", "Foundation"], page_size=100).foods)
-        survey = list(client.search(query, data_type=["Survey (FNDDS)"], page_size=100).foods)
+        jobs = [_pool.submit(client.search, query, data_type=types, page_size=size)
+                for types, size in ((["SR Legacy", "Foundation"], 60), (["Survey (FNDDS)"], 60), (["Branded"], 25))]
+        analysed, survey, branded = (list(job.result(timeout=20).foods) for job in jobs)
         generic = analysed + survey
-        branded = list(client.search(query, data_type=["Branded"], page_size=50).foods)
     except Exception:
         logger.warning("Filtered USDA search failed; using an unfiltered search", exc_info=True)
         generic, branded = list(client.search(query, page_size=100).foods), []

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import { Navigate, useSearchParams } from "react-router-dom"
 import { ApiError } from "../api/client.ts"
@@ -18,6 +18,14 @@ import type { FoodMeasure, FoodSummary, Meal } from "../types/api.ts"
 // The camera code is only downloaded when someone taps "Scan barcode".
 const BarcodeScanner = lazy(() => import("../components/food/BarcodeScanner.tsx"))
 
+function prefetchMeasures(queryClient: ReturnType<typeof useQueryClient>, fdcId: number) {
+  return queryClient.prefetchQuery({
+    queryKey: ["foods", "measures", fdcId],
+    queryFn: () => getMeasures(fdcId),
+    staleTime: 30 * 60 * 1000,
+  })
+}
+
 /** A food picked from search, or found by barcode (which arrives with its servings). */
 type Selected = FoodSummary & { measures?: FoodMeasure[]; source?: string }
 
@@ -36,16 +44,29 @@ export function AddFoodPage() {
   const logFood = useLogFood()
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(query.trim()), 300)
+    const timer = window.setTimeout(() => setDebounced(query.trim()), 200)
     return () => window.clearTimeout(timer)
   }, [query])
 
   const frequent = useQuery({ queryKey: ["foods", "frequent"], queryFn: getFrequentFoods })
+  const queryClient = useQueryClient()
   const search = useQuery({
-    queryKey: ["foods", "search", debounced],
+    queryKey: ["foods", "search", debounced.toLowerCase()],
     queryFn: () => searchFoods(debounced),
     enabled: debounced.length >= 2,
+    // Keep the last results on screen while the next search loads, and reuse
+    // results for 30 minutes (USDA data doesn't change during a session).
+    placeholderData: keepPreviousData,
+    staleTime: 30 * 60 * 1000,
   })
+
+  // Load serving sizes for the top results in the background, so tapping one
+  // opens the quantity panel straight away.
+  useEffect(() => {
+    for (const food of search.data?.foods.slice(0, 5) ?? []) {
+      if (food.fdc_id != null) void prefetchMeasures(queryClient, food.fdc_id)
+    }
+  }, [search.data, queryClient])
 
   if (nutrition.isLoading) return <Skeleton className="h-40 w-full" />
   if (nutrition.data && !nutrition.data.configured) return <Navigate to="/onboarding" replace />
@@ -91,6 +112,7 @@ export function AddFoodPage() {
             </Button>
           ) : null}
           {search.isLoading ? <Skeleton className="mt-4 h-20 w-full" /> : null}
+          {search.isFetching && !search.isLoading ? <p className="mt-2 text-xs text-muted" aria-live="polite">Searching…</p> : null}
           {search.isError ? (
             <p className="mt-3 text-sm text-danger">{search.error instanceof ApiError ? search.error.message : "Food search failed."}</p>
           ) : null}
@@ -101,6 +123,7 @@ export function AddFoodPage() {
                 <button
                   type="button"
                   className="w-full rounded-2xl border border-line px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  onPointerDown={() => { if (food.fdc_id != null) void prefetchMeasures(queryClient, food.fdc_id) }}
                   onClick={() => setSelected(food)}
                 >
                   <span className="block font-semibold">{food.description}</span>
@@ -183,6 +206,7 @@ function ServingSheet({
     queryKey: ["foods", "measures", food.fdc_id],
     queryFn: () => getMeasures(food.fdc_id as number),
     enabled: food.measures == null && food.fdc_id != null,
+    staleTime: 30 * 60 * 1000,
   })
   const measures = food.measures ? { data: { measures: food.measures }, isLoading: false, isError: false, error: null } : fetched
   const [measureCode, setMeasureCode] = useState("")

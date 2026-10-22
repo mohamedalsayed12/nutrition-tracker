@@ -32,8 +32,6 @@ def _target_name(value):
         return "Pantothenic acid (B5)"
     if name == "vitamin b6" or name.startswith("vitamin b 6"):
         return "Vitamin B6"
-    if name == "biotin" or name.startswith("biotin ") or name.startswith("vitamin b 7"):
-        return "Biotin (B7)"
     if name.startswith("folate dfe") or name.startswith("folate dietary folate equivalents"):
         return "Folate (B9)"
     if name == "vitamin e" or name.startswith("vitamin e alpha tocopherol"):
@@ -42,7 +40,7 @@ def _target_name(value):
         return "Vitamin K"
     if name in ("choline", "choline total"):
         return "Choline"
-    for nutrient in ("Calcium", "Chloride", "Chromium", "Copper", "Fluoride", "Iodine", "Iron", "Magnesium", "Manganese", "Molybdenum", "Phosphorus", "Potassium", "Selenium", "Sodium", "Zinc"):
+    for nutrient in ("Calcium", "Copper", "Iron", "Magnesium", "Manganese", "Phosphorus", "Potassium", "Selenium", "Sodium", "Zinc"):
         if name == nutrient.lower() or name.startswith(nutrient.lower() + " "):
             return nutrient
     return None

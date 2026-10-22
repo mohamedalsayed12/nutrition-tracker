@@ -52,7 +52,6 @@ NUTRIMENTS = (
     ("vitamin-b12", "Vitamin B-12", "µg", 1_000_000),
     ("vitamin-k", "Vitamin K (phylloquinone)", "µg", 1_000_000),
     ("vitamin-b9", "Folate, DFE", "µg", 1_000_000),
-    ("iodine", "Iodine, I", "µg", 1_000_000),
     ("selenium", "Selenium, Se", "µg", 1_000_000),
 )
 

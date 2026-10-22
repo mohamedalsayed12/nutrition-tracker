@@ -3,7 +3,7 @@ from flask import abort
 from database import db, save_calorie_target
 from models import CalorieTarget, HealthPreferences, MacroSplit, NutritionTargets
 from services.calc import apply_health_preferences, validate_care_plan_macros
-from services.nutrient_targets import micronutrient_targets
+from services.nutrient_targets import UNTRACKED, micronutrient_targets
 
 
 def require_nutrition(user_id):
@@ -29,6 +29,9 @@ def set_health_settings(user_id, data):
     nutrition = require_nutrition(user_id)
     targets = micronutrient_targets(nutrition.age, nutrition.sex, pregnant="pregnancy" in data.conditions)
     allowed = {target["name"] for target in targets}
+    # Overrides saved before a nutrient stopped being tracked are dropped quietly.
+    data.micronutrient_overrides = {name: value for name, value in data.micronutrient_overrides.items()
+                                    if name not in UNTRACKED}
     if not set(data.micronutrient_overrides).issubset(allowed):
         raise ValueError("Unknown micronutrient override.")
     preferences = db.session.get(HealthPreferences, user_id)

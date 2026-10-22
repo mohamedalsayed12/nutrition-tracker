@@ -32,7 +32,7 @@ class ConditionTargetTest(unittest.TestCase):
         targets = {row["name"]: row["target"] for row in configured_micronutrients(30, "female", preferences)}
         self.assertEqual(targets["Iron"], 30)
         self.assertEqual(targets["Folate (B9)"], 600)
-        self.assertEqual(targets["Iodine"], 220)
+        self.assertNotIn("Iodine", targets)
         self.assertEqual(targets["Choline"], 450)
 
     def test_each_profile_focus_matches_tracked_nutrients_and_overlaps(self):

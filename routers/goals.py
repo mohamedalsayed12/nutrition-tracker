@@ -6,6 +6,7 @@ from models import CalorieTarget, NutritionTargets, UserActivityBaseline, UserMe
 from oauth2 import current_user_id
 from schemas import CalorieGoal, NutritionSetup, validate_body
 from services.goals import set_nutrition_goals
+from services.nutrient_targets import UNTRACKED
 from services.settings import set_calories
 
 
@@ -36,7 +37,8 @@ def nutrition():
     measurements = db.session.get(UserMeasurements, user_id)
     baseline = db.session.get(UserActivityBaseline, user_id)
     return jsonify(configured=True, age=target.age, sex=target.sex, protein_min=target.protein_min,
-                   protein_max=target.protein_max, carbs=target.carbs, micronutrients=target.micronutrients,
+                   protein_max=target.protein_max, carbs=target.carbs,
+                   micronutrients=[row for row in target.micronutrients or [] if row.get("name") not in UNTRACKED],
                    height_cm=measurements.height_cm if measurements else None,
                    weight_kg=measurements.weight_kg if measurements else None,
                    activity_level=baseline.activity_level if baseline else None)

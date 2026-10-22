@@ -65,3 +65,23 @@ def test_search_falls_back_when_filtered_search_fails(client, monkeypatch):
     response = client.get("/api/v1/foods", query_string={"q": "apple"})
     assert response.status_code == 200
     assert [food["fdc_id"] for food in response.json["foods"]] == [7]
+
+
+def test_usda_answers_are_cached(monkeypatch):
+    calls = []
+
+    def fake_request(self, endpoint, method="GET", params=None, data=None):
+        calls.append(endpoint)
+        if endpoint.startswith("food/"):
+            return {"fdcId": 5, "description": "Bananas, raw", "dataType": "SR Legacy", "foodNutrients": []}
+        return {"foods": [{"fdcId": 5, "description": "Bananas, raw", "dataType": "SR Legacy"}],
+                "totalHits": 1, "currentPage": 1, "totalPages": 1}
+
+    food_search._cache.clear()
+    monkeypatch.setattr(food_search.FoodClient, "_make_request", fake_request)
+    client = food_search.FoodClient("test-key")
+    for _ in range(3):
+        assert client.search("Banana ", data_type=["SR Legacy"]).foods[0].fdc_id == 5
+        assert client.get_food(5).description == "Bananas, raw"
+    assert len(calls) == 2  # one search and one food lookup; the rest came from memory
+    food_search._cache.clear()
