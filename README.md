@@ -146,6 +146,12 @@ GitHub Actions runs on every push and pull request. The `build` job starts Postg
 
 Do not commit production credentials.
 
+## The app: health4everyone
+
+Heroku serves the React app in `frontend/` at the site root, and the API under `/api/v1`, from
+the same address. The deploy job builds the React app and ships `frontend/dist` with the release;
+`routers/spa.py` serves it. The original server-rendered pages are still available under `/classic`.
+
 ## Using it on a phone
 
 The site is a Progressive Web App, so it can be installed from the browser:

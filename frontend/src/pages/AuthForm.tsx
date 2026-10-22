@@ -136,7 +136,7 @@ function AuthScreen({
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
       <div className="mb-6 flex items-center justify-between">
-        <p className="font-display text-lg font-medium">Nutrition tracker</p>
+        <p className="font-display text-lg font-medium">health4everyone</p>
         <ThemeToggle />
       </div>
       <Card>

@@ -24,31 +24,31 @@ def _csrf(page):
 
 
 def test_browser_pages_are_available(client):
-    login = client.get("/login")
+    login = client.get("/classic/login")
     assert login.status_code == 200
     assert b"Login" in login.data
-    register = client.get("/register")
+    register = client.get("/classic/register")
     assert register.status_code == 200
     assert b"REGISTER NOW" in register.data
-    homepage = client.get("/homepage")
+    homepage = client.get("/classic/homepage")
     assert homepage.status_code == 302
-    assert "/login" in homepage.headers["Location"]
+    assert "/classic/login" in homepage.headers["Location"]
     missing = client.get("/static/example.css")
     assert missing.status_code == 404
     assert missing.is_json
 
-    created = client.post("/register", data={
+    created = client.post("/classic/register", data={
         "csrf_token": _csrf(register.data), "name": "Page User",
         "email": "page@example.com", "password": "a-secure-password",
     })
     assert created.status_code == 302
-    signed_in = client.post("/login", data={
-        "csrf_token": _csrf(client.get("/login").data),
+    signed_in = client.post("/classic/login", data={
+        "csrf_token": _csrf(client.get("/classic/login").data),
         "email": "page@example.com", "password": "a-secure-password",
     }, follow_redirects=True)
     assert b"Meals Log" in signed_in.data
-    assert client.get("/UserInfo").status_code == 200
-    assert client.get("/weekly-recap").status_code == 200
+    assert client.get("/classic/UserInfo").status_code == 200
+    assert client.get("/classic/weekly-recap").status_code == 200
 
 
 @pytest.mark.parametrize("payload", [

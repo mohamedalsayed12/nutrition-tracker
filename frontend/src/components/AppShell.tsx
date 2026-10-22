@@ -13,7 +13,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="hidden border-r border-line bg-card lg:flex lg:flex-col lg:px-4 lg:py-6">
-        <p className="px-3 font-display text-lg font-medium">Nutrition tracker</p>
+        <p className="px-3 font-display text-lg font-medium">health4everyone</p>
         <nav className="mt-8 flex flex-col gap-1" aria-label="Primary">
           {links.map((link) => (
             <NavLink
@@ -30,9 +30,9 @@ export function AppShell() {
           ))}
         </nav>
       </aside>
-      <div className="pb-24 lg:pb-0">
-        <header className="flex items-center justify-between px-4 py-4 lg:px-8">
-          <p className="font-display text-lg font-medium lg:hidden">Nutrition tracker</p>
+      <div className="pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <header className="flex items-center justify-between px-4 py-4 pt-[max(1rem,env(safe-area-inset-top))] lg:px-8">
+          <p className="font-display text-lg font-medium lg:hidden">health4everyone</p>
           <div className="ml-auto">
             <ThemeToggle />
           </div>
@@ -41,7 +41,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
-      <nav className="fixed inset-x-0 bottom-0 grid grid-cols-4 border-t border-line bg-card px-2 py-2 lg:hidden" aria-label="Primary">
+      <nav className="fixed inset-x-0 bottom-0 grid grid-cols-4 border-t border-line bg-card px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden" aria-label="Primary">
         {links.map((link) => (
           <NavLink
             key={link.to}

@@ -47,18 +47,23 @@ class RegistrationForm(FlaskForm):
     password = PasswordField("Password", validators=[DataRequired()])
 
 
+# The original server-rendered pages. The React app (frontend/) is the main
+# interface, so these live under /classic.
+CLASSIC = "/classic"
+
+
 def register_pages(app):
-    app.add_url_rule("/", endpoint="root", view_func=root)
-    app.add_url_rule("/login", endpoint="auth.login_page", view_func=login_page, methods=["GET", "POST"])
-    app.add_url_rule("/register", endpoint="auth.registration_page", view_func=registration_page, methods=["GET", "POST"])
-    app.add_url_rule("/homepage", endpoint="home_page", view_func=home_page, methods=["GET", "POST"])
-    app.add_url_rule("/UserInfo", endpoint="user_info_page", view_func=user_info_page, methods=["GET", "POST"])
-    app.add_url_rule("/macro-split", endpoint="macro_split_settings", view_func=macro_split_settings, methods=["GET", "POST"])
-    app.add_url_rule("/health-settings", endpoint="health_settings", view_func=health_settings, methods=["GET", "POST"])
-    app.add_url_rule("/weekly-recap", endpoint="weekly_recap_page", view_func=weekly_recap_page)
-    app.add_url_rule("/days/save", endpoint="save_eating_day", view_func=save_eating_day, methods=["POST"])
-    app.add_url_rule("/logs/food/<int:log_id>/delete", endpoint="delete_food_log", view_func=delete_food_log, methods=["POST"])
-    app.add_url_rule("/logs/activity/<int:log_id>/delete", endpoint="delete_activity_log", view_func=delete_activity_log, methods=["POST"])
+    app.add_url_rule(CLASSIC, endpoint="classic_root", view_func=root)
+    app.add_url_rule(f"{CLASSIC}/login", endpoint="auth.login_page", view_func=login_page, methods=["GET", "POST"])
+    app.add_url_rule(f"{CLASSIC}/register", endpoint="auth.registration_page", view_func=registration_page, methods=["GET", "POST"])
+    app.add_url_rule(f"{CLASSIC}/homepage", endpoint="home_page", view_func=home_page, methods=["GET", "POST"])
+    app.add_url_rule(f"{CLASSIC}/UserInfo", endpoint="user_info_page", view_func=user_info_page, methods=["GET", "POST"])
+    app.add_url_rule(f"{CLASSIC}/macro-split", endpoint="macro_split_settings", view_func=macro_split_settings, methods=["GET", "POST"])
+    app.add_url_rule(f"{CLASSIC}/health-settings", endpoint="health_settings", view_func=health_settings, methods=["GET", "POST"])
+    app.add_url_rule(f"{CLASSIC}/weekly-recap", endpoint="weekly_recap_page", view_func=weekly_recap_page)
+    app.add_url_rule(f"{CLASSIC}/days/save", endpoint="save_eating_day", view_func=save_eating_day, methods=["POST"])
+    app.add_url_rule(f"{CLASSIC}/logs/food/<int:log_id>/delete", endpoint="delete_food_log", view_func=delete_food_log, methods=["POST"])
+    app.add_url_rule(f"{CLASSIC}/logs/activity/<int:log_id>/delete", endpoint="delete_activity_log", view_func=delete_activity_log, methods=["POST"])
 
 
 def root():

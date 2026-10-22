@@ -4,7 +4,7 @@ def test_manifest_describes_an_installable_app(client):
     assert response.mimetype == "application/manifest+json"
     manifest = response.get_json()
     assert manifest["display"] == "standalone"
-    assert manifest["start_url"] == "/homepage"
+    assert manifest["start_url"] == "/"
     sizes = {icon["sizes"] for icon in manifest["icons"]}
     assert {"192x192", "512x512"} <= sizes
 
@@ -22,7 +22,7 @@ def test_icons_and_service_worker_are_served(client):
 
 
 def test_pages_have_phone_viewport_and_manifest_link(client):
-    for path in ("/login", "/register"):
+    for path in ("/classic/login", "/classic/register"):
         html = client.get(path).get_data(as_text=True)
         assert 'name="viewport"' in html, path
         assert 'rel="manifest"' in html, path

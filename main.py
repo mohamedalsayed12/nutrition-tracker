@@ -8,6 +8,7 @@ from oauth2 import jwt
 from routers import register_routes
 from routers.pages import register_pages
 from routers.pwa import register_pwa
+from routers.spa import register_spa
 from sessions import login_manager
 from utils import bcrypt
 
@@ -28,4 +29,5 @@ def create_app(test_config=None):
     register_routes(app)
     register_pages(app)
     register_pwa(app)
+    register_spa(app)
     return app

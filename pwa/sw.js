@@ -1,7 +1,7 @@
 // Service worker for the installed app.
 // Pages and the API always come from the network, so nutrition data is never
 // stale. Only the app icons and a small offline page are kept on the phone.
-const CACHE = "nutrient-tracker-v1";
+const CACHE = "health4everyone-v1";
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL, "/icon.svg", "/icon-192.png"];
 

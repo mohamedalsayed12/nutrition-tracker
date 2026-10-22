@@ -41,6 +41,17 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m flask --app main db upgrade
       - run: python -m pytest -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
   publish_image:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PUBLISH_DOCKER_IMAGE == 'true'
     needs: [build]
@@ -70,6 +81,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build the React app
+        working-directory: frontend
+        # Empty VITE_API_URL: the app calls the API on its own Heroku address.
+        env:
+          VITE_API_URL: ''
+        run: |
+          npm ci
+          npm run build
       - name: Deploy to Heroku
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
@@ -79,4 +103,9 @@ jobs:
             echo "HEROKU_API_KEY is not set, so this push is not deployed to Heroku."
             exit 0
           fi
-          git push "https://heroku:${HEROKU_API_KEY}@git.heroku.com/${HEROKU_APP_NAME}.git" HEAD:main
+          # frontend/dist is not in git, so add it in a deploy-only commit.
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -f frontend/dist
+          git commit -q -m "Deploy ${GITHUB_SHA::7} with the built React app"
+          git push --force "https://heroku:${HEROKU_API_KEY}@git.heroku.com/${HEROKU_APP_NAME}.git" HEAD:main

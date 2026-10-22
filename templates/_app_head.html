@@ -1,12 +1,12 @@
 {# Lets phones install the site as an app ("Add to Home Screen"). #}
 <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#1b7a43">
 <link rel="icon" href="{{ url_for('pwa_icon', name='icon.svg') }}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{{ url_for('pwa_icon', name='apple-touch-icon.png') }}">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Nutrients">
+<meta name="apple-mobile-web-app-title" content="health4everyone">
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {

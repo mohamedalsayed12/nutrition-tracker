@@ -8,15 +8,15 @@ PWA_DIR = ROOT / "pwa"
 ICONS = {"icon.svg", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"}
 
 MANIFEST = {
-    "name": "Nutrient Tracker",
-    "short_name": "Nutrients",
+    "name": "health4everyone",
+    "short_name": "health4everyone",
     "description": "Log meals and track calories, macros and micronutrients.",
-    "start_url": "/homepage",
+    "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "orientation": "portrait",
-    "background_color": "#000000",
-    "theme_color": "#000000",
+    "background_color": "#f3f5f1",
+    "theme_color": "#1b7a43",
     "icons": [
         {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
         {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},

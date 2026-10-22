@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>{% block title %}{% endblock %} - Nutrient Tracker</title>
+  <title>{% block title %}{% endblock %} - health4everyone</title>
   {% include "_app_head.html" %}
   <style>
     /* Phone-friendly defaults shared by every page. */
@@ -36,7 +36,7 @@
 </head>
 <body>
 <nav>
-  <h1>Nutrient Tracker</h1>
+  <h1>health4everyone</h1>
   <ul>
     {% if current_user.is_authenticated %}
       <li><span>{{ current_user.username }}</span></li>
