@@ -1,7 +1,12 @@
 import pytest
 
-from services.calc import (UserInfo, calculate_goal_targets, mifflin_st_jeor_bmr, protein_per_kg,
-                           protein_targets)
+from services.calc import (
+    UserInfo,
+    calculate_goal_targets,
+    mifflin_st_jeor_bmr,
+    protein_per_kg,
+    protein_targets,
+)
 
 
 def info(age=22, sex="male", height=180, weight=80, activity="moderately active"):

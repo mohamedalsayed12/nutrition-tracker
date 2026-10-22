@@ -1,6 +1,6 @@
 import math
 import re
-from datetime import timezone, timedelta
+from datetime import UTC, timedelta
 
 from services.nutrient_scoring import matched_micronutrients
 
@@ -16,7 +16,9 @@ def food_macros(nutrients):
         unit = str(nutrient.get("unit", "")).lower().strip()
         key = priority = None
         if unit == "kcal" and name.startswith("energy"):
-            key, priority = "Calories", 0 if name == "energy" else 1
+            # Plain "Energy" first; Foundation foods give Atwater values, where the
+            # food-specific factors are more accurate than the general 4/4/9.
+            key, priority = "Calories", 0 if name == "energy" else 1 if "specific" in name else 2
         elif unit == "g" and name == "protein":
             key, priority = "Protein", 0
         elif unit == "g" and name in ("carbohydrate by difference", "carbohydrate by summation", "carbohydrate"):
@@ -43,7 +45,7 @@ def unique_week_foods(food_logs, local_timezone, week_start):
     for log in sorted(food_logs, key=lambda row: (row.logged_at, row.id), reverse=True):
         logged_at = log.logged_at
         if logged_at.tzinfo is None:
-            logged_at = logged_at.replace(tzinfo=timezone.utc)
+            logged_at = logged_at.replace(tzinfo=UTC)
         day = logged_at.astimezone(local_timezone).date()
         if not week_start <= day <= week_end:
             continue

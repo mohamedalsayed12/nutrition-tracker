@@ -26,7 +26,13 @@ UNUSUAL = {
     "baby", "infant", "toddler", "formula", "human", "dessert", "candied", "candy", "candies",
     "pie", "cake", "cookie", "cracker", "pudding", "supplement", "substitute", "imitation",
     "bar", "snack", "cereal", "flavored", "flavor", "usda", "commodity", "school", "lunch",
+    # Words that make it a different product from the plain food: bread sticks,
+    # breadcrumbs, salmon nuggets, salmon salad, chicken sandwich.
+    "stick", "crumb", "stuffing", "crouton", "chip", "nugget", "salad", "sandwich", "dip",
 }
+# USDA puts a category in front of some names: "Fish, salmon, raw", "Nuts,
+# almonds", "Spices, pepper, black". The category is skipped when matching.
+CATEGORY_PREFIXES = {"fish", "nut", "seed", "spice", "beverage", "crustacean", "mollusk"}
 PROCESSED = {
     "canned", "dried", "dehydrated", "frozen", "juice", "sauce", "breaded", "coated", "glazed",
     "sweetened", "syrup", "powder", "concentrate", "malted", "evaporated", "condensed",
@@ -74,6 +80,9 @@ def matches(food, query_words):
 
 def _match_tier(description, query_words):
     segments = [words(segment) for segment in description.split(",")]
+    if (len(segments) > 1 and segments[0] in ([word] for word in CATEGORY_PREFIXES)
+            and query_words[0] not in segments[0]):
+        segments = segments[1:]
     first_words = segments[0] if segments else []
     if not first_words or first_words[0] != query_words[0]:
         return 2  # the name only contains the search, e.g. "Goat milk"

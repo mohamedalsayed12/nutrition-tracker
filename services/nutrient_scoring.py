@@ -49,7 +49,16 @@ def _target_name(value):
 
 
 def _unit(value):
-    return str(value).lower().strip().replace("Ã‚Âµ", "u").replace("ÃŽÂ¼", "u").replace("Ã¯Â¿Â½", "u")
+    # USDA writes micrograms as "µg" (micro sign) in full food records and "UG" in
+    # abridged ones; the Greek mu and some mis-encoded forms also turn up.
+    unit = str(value).lower().strip()
+    for micro in ("\u00b5", "\u03bc", "Ã‚Âµ", "ÃŽÂ¼", "Ã¯Â¿Â½", "Âµ", "Î¼"):
+        unit = unit.replace(micro, "u")
+    return unit
+
+
+# Branded labels can give vitamin D in International Units: 1 IU = 0.025 mcg.
+VITAMIN_D_MCG_PER_IU = 0.025
 
 
 def _convert(amount, source_unit, target_unit):
@@ -76,10 +85,23 @@ def matched_micronutrients(nutrients, targets, amount_field):
         name = _target_name(nutrient.get("name", ""))
         if name not in target_by_name:
             continue
-        amount = _convert(nutrient.get(amount_field), nutrient.get("unit"), target_by_name[name]["unit"])
+        unit = nutrient.get("unit")
+        if name == "Vitamin D" and _unit(unit) == "iu":
+            iu = _convert_iu(nutrient.get(amount_field))
+            amount = None if iu is None else _convert(iu * VITAMIN_D_MCG_PER_IU, "mcg", target_by_name[name]["unit"])
+        else:
+            amount = _convert(nutrient.get(amount_field), unit, target_by_name[name]["unit"])
         if amount is not None:
             matched[name] = max(amount, matched.get(name, 0))
     return matched
+
+
+def _convert_iu(amount):
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return None
+    return amount if math.isfinite(amount) and amount >= 0 else None
 
 
 def _energy_per_100g(nutrients):
@@ -93,7 +115,7 @@ def _energy_per_100g(nutrients):
         except (TypeError, ValueError):
             continue
         if math.isfinite(amount) and amount > 0:
-            candidates.append((name != "energy", amount))
+            candidates.append((0 if name == "energy" else 1 if "specific" in name else 2, amount))
     return min(candidates)[1] if candidates else None
 
 

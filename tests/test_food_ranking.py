@@ -130,3 +130,28 @@ def test_plain_cooked_rice_comes_before_fried_rice_and_rice_dishes():
     assert ranked.index(58) < ranked.index(56)  # plain long-grain before rice with coconut milk
     assert ranked.index(51) < ranked.index(57)  # fried rice before fried rice with chicken
     assert ranked[-2:] == [59, 60]              # rice noodles and rice milk last
+
+
+# Real USDA results for "salmon" and "bread" (generic part), in USDA's order.
+SALMON = [food(71, "Salmon, sockeye, canned, total can contents"),
+          food(72, "Salmon, red (sockeye), filets with skin, smoked (Alaska Native)"),
+          food(73, "Salmon nuggets, cooked as purchased, unheated", "Survey (FNDDS)"),
+          food(74, "Salmon salad", "Survey (FNDDS)"),
+          food(75, "Fish, salmon, raw", "Survey (FNDDS)"),
+          food(76, "Fish, salmon, pink, raw"), food(77, "Fish, salmon, sockeye, raw")]
+BREAD = [food(81, "Bread, sticks, plain"), food(82, "Bread, whole wheat", "Survey (FNDDS)"),
+         food(83, "Bread, white", "Survey (FNDDS)"), food(84, "Bread, crumbs, dry, grated, plain"),
+         food(85, "Bread, rye", "Survey (FNDDS)")]
+
+
+def test_raw_salmon_comes_first_even_though_usda_names_it_fish_salmon():
+    ranked = ids(rank_foods(SALMON, "salmon"))
+    assert ranked[0] == 75                      # "Fish, salmon, raw"
+    assert ranked.index(76) < ranked.index(71)  # raw before canned
+    assert ranked.index(71) < ranked.index(73)  # canned salmon before salmon nuggets
+
+
+def test_bread_puts_a_loaf_bread_before_breadsticks_and_crumbs():
+    ranked = ids(rank_foods(BREAD, "bread"))
+    assert ranked[0] in (82, 83, 85)
+    assert ranked[-2:] in ([81, 84], [84, 81])

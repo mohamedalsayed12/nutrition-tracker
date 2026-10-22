@@ -297,8 +297,23 @@ _CUT_WORDS = re.compile(r"slice|chop|dice|cube|piece|half|halves|quarter|shred|g
 _PLACEHOLDER_UNITS = {"undetermined", "unit", "units", ""}
 
 
+# FNDDS lists reference amounts that are not servings anyone eats, such as
+# "Guideline amount per fl oz of beverage" (2.5 g for milk). They are skipped.
+_SKIPPED_PORTIONS = ("quantity not specified", "guideline amount")
+# USDA jargon for a standard serving: Reference Amount Customarily Consumed, and
+# the Nutrition Labeling and Education Act serving.
+_SERVING_JARGON = re.compile(r"^\s*1\s+(?:RACC|NLEA serving)\s*$", re.IGNORECASE)
+# Portions that are a package size rather than a normal helping, so they are not pre-selected.
+_NOT_A_DEFAULT = re.compile(r"\b(?:container|package|school|can|bunch|jar|bottle|loaf)\b", re.IGNORECASE)
+
+
 def _portion_label(portion):
-    if portion.portion_description and not portion.portion_description.lower().startswith("quantity not specified"):
+    label = _raw_portion_label(portion)
+    return "1 serving" if _SERVING_JARGON.match(label or "") else label
+
+
+def _raw_portion_label(portion):
+    if portion.portion_description and not portion.portion_description.lower().startswith(_SKIPPED_PORTIONS):
         return portion.portion_description
     unit = (portion.measure_unit or "").strip()
     if unit.lower() in _PLACEHOLDER_UNITS:
@@ -311,8 +326,8 @@ def food_measures(food):
     """Serving sizes for a food, ordered like Cronometer: household portions first.
 
     Exactly one measure has "default": True, the one to pre-select: a "medium"
-    portion if USDA has one, else the first portion, else the package serving,
-    else 100 g.
+    portion if USDA has one, else the first portion that is a normal helping
+    rather than a package size, else the first portion, else 100 g.
     """
     portions = []
     volume_reference = None
@@ -330,7 +345,7 @@ def food_measures(food):
         portion_grams = _positive_grams(portion.gram_weight)
         if portion_grams is None:
             continue
-        if (portion.portion_description or "").lower().startswith("quantity not specified"):
+        if (portion.portion_description or "").lower().startswith(_SKIPPED_PORTIONS):
             continue
         label = _portion_label(portion) or "1 portion"
         portions.append({"code": f"portion:{index}",
@@ -363,6 +378,7 @@ def food_measures(food):
         {"code": "100g", "label": "100 g", "grams": 100.0},
     ]
     default = (next((item for item in portions if re.search(r"\bmedium\b", item["label"], re.IGNORECASE)), None)
+               or next((item for item in portions if not _NOT_A_DEFAULT.search(item["label"])), None)
                or (portions[0] if portions else None)
                or next(item for item in measures if item["code"] == "100g"))
     for item in measures:
