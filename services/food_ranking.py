@@ -131,7 +131,9 @@ def rank_foods(foods, query, raw_first=True):
 
     generic, branded, seen = [], [], set()
     for food in candidates:
-        key = _same_food_key(food) if food.data_type != "Branded" else ("branded", food.fdc_id)
+        # Identical branded names ("RICE" from five shops) are shown once.
+        key = (_same_food_key(food) if food.data_type != "Branded"
+               else ("branded", (food.description or "").lower(), (getattr(food, "brand_name", None) or "").lower()))
         if key in seen:
             continue
         seen.add(key)

@@ -80,7 +80,12 @@ def _find_foods(client, query, raw_first=True):
     # products cannot crowd everyday foods out of the results. If USDA rejects the
     # filtered searches, fall back to one unfiltered search rather than failing.
     try:
-        generic = list(client.search(query, data_type=GENERIC_TYPES, page_size=100).foods)
+        # Lab-analysed foods (SR Legacy, Foundation) are fetched on their own: they
+        # hold the plain raw entries ("Rice, white, long-grain, raw"), which USDA's
+        # relevance order otherwise pushes behind dozens of Survey dishes.
+        analysed = list(client.search(query, data_type=["SR Legacy", "Foundation"], page_size=100).foods)
+        survey = list(client.search(query, data_type=["Survey (FNDDS)"], page_size=100).foods)
+        generic = analysed + survey
         branded = list(client.search(query, data_type=["Branded"], page_size=50).foods)
     except Exception:
         logger.warning("Filtered USDA search failed; using an unfiltered search", exc_info=True)

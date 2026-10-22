@@ -155,3 +155,9 @@ def test_bread_puts_a_loaf_bread_before_breadsticks_and_crumbs():
     ranked = ids(rank_foods(BREAD, "bread"))
     assert ranked[0] in (82, 83, 85)
     assert ranked[-2:] in ([81, 84], [84, 81])
+
+
+def test_identical_branded_names_are_shown_once():
+    foods = [food(91, "RICE", "Branded", "Store A"), food(92, "RICE", "Branded", "Store A"),
+             food(93, "RICE", "Branded", "Store B"), food(94, "Rice, cooked, NFS", "Survey (FNDDS)")]
+    assert ids(rank_foods(foods, "rice")) == [94, 91, 93]
