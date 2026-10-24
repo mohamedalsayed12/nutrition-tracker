@@ -16,7 +16,6 @@ def info(age=22, sex="male", height=180, weight=80, activity="moderately active"
 
 
 def test_bmr_uses_mifflin_st_jeor_for_each_sex():
-    # 10 x 80 + 6.25 x 180 - 5 x 22 = 1815
     assert mifflin_st_jeor_bmr(80, 180, 22, "male") == 1820.0
     assert mifflin_st_jeor_bmr(80, 180, 22, "female") == 1654.0
     with pytest.raises(ValueError):

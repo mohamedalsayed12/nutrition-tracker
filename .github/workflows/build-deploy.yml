@@ -9,7 +9,6 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          # App DB for migrations; tests use a separate *_test database.
           POSTGRES_DB: nutrition
           POSTGRES_USER: nutrition
           POSTGRES_PASSWORD: test-password
@@ -71,8 +70,6 @@ jobs:
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/nutrition-tracker:latest
 
   deploy_heroku:
-    # GitHub does not allow the secrets context in a job-level `if`, so the
-    # check for the API key happens inside the step instead.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build]
     runs-on: ubuntu-latest
@@ -88,7 +85,6 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Build the React app
         working-directory: frontend
-        # Empty VITE_API_URL: the app calls the API on its own Heroku address.
         env:
           VITE_API_URL: ''
         run: |
@@ -103,7 +99,6 @@ jobs:
             echo "HEROKU_API_KEY is not set, so this push is not deployed to Heroku."
             exit 0
           fi
-          # frontend/dist is not in git, so add it in a deploy-only commit.
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add -f frontend/dist

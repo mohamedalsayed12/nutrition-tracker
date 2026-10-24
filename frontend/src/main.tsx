@@ -27,8 +27,6 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>,
 )
 
-// Lets the installed app show an offline screen. Only in the built app: the dev
-// server has no /sw.js.
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {})

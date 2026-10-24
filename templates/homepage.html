@@ -484,13 +484,11 @@
             option.dataset.grams = String(item.grams);
             return option;
           }));
-          // The server marks the serving to pre-select (e.g. "1 medium"), like Cronometer.
           const preferred = data.measures.find((item) => item.default);
           if (preferred && !quantityEdited) {
             measure.value = preferred.code;
             quantity.value = '1';
           } else {
-            // A quantity already set (a "log again" food, or typed before the list loaded) is in grams.
             measure.value = 'g';
           }
           previousMeasureGrams = Number(measure.selectedOptions[0].dataset.grams);

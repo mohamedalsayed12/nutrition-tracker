@@ -29,7 +29,6 @@ def set_health_settings(user_id, data):
     nutrition = require_nutrition(user_id)
     targets = micronutrient_targets(nutrition.age, nutrition.sex, pregnant="pregnancy" in data.conditions)
     allowed = {target["name"] for target in targets}
-    # Overrides saved before a nutrient stopped being tracked are dropped quietly.
     data.micronutrient_overrides = {name: value for name, value in data.micronutrient_overrides.items()
                                     if name not in UNTRACKED}
     if not set(data.micronutrient_overrides).issubset(allowed):

@@ -28,7 +28,6 @@ def usda(fdc_id, description, nutrients, portions=(), data_type="SR Legacy", gti
                            serving_size=None, serving_size_unit=None, household_serving_fulltext=None)
 
 
-# Real USDA values per 100 g.
 EGG = usda(171287, "Egg, whole, raw, fresh", [n("Energy", "kcal", 143), n("Protein", "g", 12.6)],
            [p("1 large", 50), p("1 medium", 44)])
 BANANA = usda(173944, "Bananas, raw", [n("Energy", "kcal", 89), n("Potassium, K", "mg", 358)],
@@ -67,9 +66,6 @@ def sign_up(client, email="voice@example.com"):
     return headers
 
 
-# --- Open Food Facts ------------------------------------------------------------
-
-# A real-shaped Open Food Facts product (values per 100 g, minerals in grams).
 OFF_PRODUCT = {
     "product_name": "Greek Style Natural Yogurt", "brands": "Tesco, Tesco Finest",
     "serving_size": "1 pot (150 g)", "serving_quantity": "150",
@@ -86,7 +82,7 @@ def test_open_food_facts_product_becomes_a_usda_shaped_food():
     assert food.brand_name == "Tesco"
     assert values["Energy"] == (113, "kcal")
     assert values["Protein"] == (5.1, "g")
-    assert values["Sodium, Na"] == (60, "mg")            # 0.15 g salt = 60 mg sodium
+    assert values["Sodium, Na"] == (60, "mg")
     assert values["Calcium, Ca"] == (150, "mg")
     assert values["Vitamin D (D2 + D3)"] == (1.2, "µg")
     assert food.serving_size == 150
@@ -144,8 +140,6 @@ def test_logging_an_open_food_facts_product(client, fake_usda, monkeypatch):
     assert both.status_code in (400, 422)
 
 
-# --- Siri: parsing ------------------------------------------------------------------
-
 @pytest.mark.parametrize("said, meal, items", [
     ("I had two scrambled eggs, a slice of toast and 250 ml of milk for breakfast", "breakfast",
      [(2, None, "scrambled eggs"), (1, "slice", "toast"), (250, "ml", "milk")]),
@@ -173,8 +167,6 @@ def test_meal_from_the_time_of_day():
     assert meal_for_time(datetime(2026, 10, 22, 23, tzinfo=london)) == "snack"
 
 
-# --- Siri: keys and logging ------------------------------------------------------------
-
 def test_siri_keys_are_shown_once_and_can_only_log_food(client):
     headers = sign_up(client, "keys@example.com")
     created = client.post("/api/v1/api-tokens", json={"name": "iPhone", "timezone": "Europe/London"}, headers=headers)
@@ -184,7 +176,7 @@ def test_siri_keys_are_shown_once_and_can_only_log_food(client):
     listed = client.get("/api/v1/api-tokens", headers=headers).json["tokens"]
     assert listed[0]["name"] == "iPhone" and "key" not in listed[0]
     siri = {"Authorization": f"Bearer {key}"}
-    assert client.get("/api/v1/reports/daily", headers=siri).status_code in (401, 422)  # not a sign-in token
+    assert client.get("/api/v1/reports/daily", headers=siri).status_code in (401, 422)
     assert client.post("/api/v1/voice-log", json={"text": "an egg"}).status_code == 401
     assert client.post("/api/v1/api-tokens", json={"timezone": "Not/AZone"}, headers=headers).status_code == 422
     assert client.delete(f"/api/v1/api-tokens/{listed[0]['id']}", headers=headers).status_code == 204
@@ -200,10 +192,10 @@ def test_siri_logs_foods_with_usda_servings_and_reports_calories_left(client, fa
     body = response.json
     assert body["meal"] == "breakfast"
     logged = {item["food_name"]: item for item in body["logged"]}
-    assert logged["Egg, whole, raw, fresh"]["grams"] == 88         # 2 x the default (medium, 44 g)
-    assert logged["Bananas, raw"]["grams"] == 118                  # USDA medium banana
-    assert logged["Bread, white, toasted"]["grams"] == 22          # 1 slice
-    assert logged["Milk, whole"]["grams"] == 244                   # 1 cup, not the 2.5 g guideline amount
+    assert logged["Egg, whole, raw, fresh"]["grams"] == 88
+    assert logged["Bananas, raw"]["grams"] == 118
+    assert logged["Bread, white, toasted"]["grams"] == 22
+    assert logged["Milk, whole"]["grams"] == 244
     expected_kcal = round(143 * 0.88 + 89 * 1.18 + 293 * 0.22 + 61 * 2.44)
     assert sum(item["kcal"] for item in body["logged"]) == pytest.approx(expected_kcal, abs=2)
     assert body["calories_left"] == pytest.approx(body["calorie_target"] - body["calories_today"], abs=1)
@@ -226,8 +218,6 @@ def test_siri_says_what_it_could_not_find(client, fake_usda):
 def test_spoken_reply_when_nothing_was_heard():
     assert "didn't catch" in spoken_reply("lunch", [], [], 1500)
 
-
-# --- Raw foods first in search ----------------------------------------------------------------
 
 def test_search_shows_raw_foods_before_cooked_and_branded():
     foods = [SimpleNamespace(fdc_id=1, description="Rice, cooked, NFS", data_type="Survey (FNDDS)", brand_name=None, gtin_upc=None),

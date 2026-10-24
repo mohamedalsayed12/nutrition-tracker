@@ -9,7 +9,6 @@ def food(fdc_id, description, data_type="SR Legacy", brand_name=None):
                            brand_name=brand_name, gtin_upc=None)
 
 
-# Real USDA generic results for "milk", in the order USDA returns them.
 MILK = [food(1, "Coconut milk", "Survey (FNDDS)"), food(2, "Crackers, milk", "Survey (FNDDS)"),
         food(3, "Goat milk", "Survey (FNDDS)"), food(4, "Milk, human", "Survey (FNDDS)"),
         food(5, "Milk, malted", "Survey (FNDDS)"), food(6, "Milk, NFS", "Survey (FNDDS)"),
@@ -19,7 +18,6 @@ MILK = [food(1, "Coconut milk", "Survey (FNDDS)"), food(2, "Crackers, milk", "Su
         food(11, "Milk, whole, 3.25% milkfat, with added vitamin D", "SR Legacy"),
         food(12, "Whole Milk", "Branded", brand_name="Dairy Farm")]
 
-# Real USDA generic results for "chicken breast".
 CHICKEN = [food(21, "Lunchmeat, chicken breast, sliced", "Foundation"),
            food(22, "Chicken breast, rotisserie, skin not eaten", "Survey (FNDDS)"),
            food(23, "Chicken breast tenders, breaded, uncooked"),
@@ -39,33 +37,33 @@ def ids(foods):
 
 def test_everyday_milk_comes_before_other_milks():
     ranked = ids(rank_foods(MILK, "milk"))
-    assert ranked[0] == 7                       # "Milk, whole"
-    assert ranked.index(7) < ranked.index(1)    # before "Coconut milk"
-    assert ranked.index(6) < ranked.index(10)   # "Milk, NFS" before "Milk shake"
-    assert ranked.index(4) > ranked.index(5)    # "Milk, human" pushed down
-    assert ranked[-1] == 12                     # branded after generic
+    assert ranked[0] == 7
+    assert ranked.index(7) < ranked.index(1)
+    assert ranked.index(6) < ranked.index(10)
+    assert ranked.index(4) > ranked.index(5)
+    assert ranked[-1] == 12
 
 
 def test_plain_raw_chicken_breast_comes_first():
     ranked = ids(rank_foods(CHICKEN, "chicken breast"))
-    assert ranked[0] == 25                      # "Chicken, breast, boneless, skinless, raw"
-    assert ranked.index(22) < ranked.index(23)  # rotisserie before breaded tenders
-    assert ranked.index(23) < ranked.index(21)  # anything starting with chicken before lunchmeat
+    assert ranked[0] == 25
+    assert ranked.index(22) < ranked.index(23)
+    assert ranked.index(23) < ranked.index(21)
 
 
 def test_raw_apple_beats_candied_juice_and_baby_food():
     ranked = rank_foods(APPLE, "apple")
-    assert ids(ranked)[:3] == [34, 33, 35]     # "Apple, raw", "Apples, raw, with skin", then fuji
+    assert ids(ranked)[:3] == [34, 33, 35]
     order = ids(ranked)
-    assert order.index(31) > order.index(35)    # candied after raw fuji
-    assert order.index(36) > order.index(32)    # baby food last among apples
+    assert order.index(31) > order.index(35)
+    assert order.index(36) > order.index(32)
 
 
 def test_plural_search_and_duplicate_datasets():
     foods = [food(41, "Bananas, raw"), food(42, "Banana, raw", "Survey (FNDDS)"),
              food(43, "Bananas, dehydrated, or banana powder")]
     ranked = ids(rank_foods(foods, "bananas"))
-    assert ranked == [41, 43]                   # the FNDDS duplicate of "Bananas, raw" is merged
+    assert ranked == [41, 43]
 
 
 def test_branded_foods_are_capped_unless_nothing_generic_matches():
@@ -100,7 +98,7 @@ def test_household_portions_come_first_and_medium_is_default():
     labels = [item["label"] for item in measures]
     assert labels[:3] == ['1 large (3-1/4" dia) (223 g)', '1 medium (3" dia) (182 g)', "1 cup, sliced (109 g)"]
     assert [item["label"] for item in measures if item["default"]] == ['1 medium (3" dia) (182 g)']
-    assert labels[3:] == ["g", "oz (28.35 g)", "lb (453.59 g)", "100 g"]   # no tablespoons of sliced apple
+    assert labels[3:] == ["g", "oz (28.35 g)", "lb (453.59 g)", "100 g"]
 
 
 def test_liquids_get_volume_units_and_plain_foods_default_to_100_g():
@@ -112,7 +110,6 @@ def test_liquids_get_volume_units_and_plain_foods_default_to_100_g():
     assert [item["code"] for item in plain if item["default"]] == ["100g"]
 
 
-# Real USDA results for "rice" (generic part), in the order USDA returned them.
 RICE = [food(51, "Rice, fried, NFS", "Survey (FNDDS)"), food(52, "Rice, cooked, NFS", "Survey (FNDDS)"),
         food(53, "Rice, cooked, with milk", "Survey (FNDDS)"),
         food(54, "Rice, white, cooked, glutinous", "Survey (FNDDS)"),
@@ -125,14 +122,13 @@ RICE = [food(51, "Rice, fried, NFS", "Survey (FNDDS)"), food(52, "Rice, cooked, 
 
 def test_plain_cooked_rice_comes_before_fried_rice_and_rice_dishes():
     ranked = ids(rank_foods(RICE, "rice"))
-    assert ranked[0] == 52                      # "Rice, cooked, NFS"
-    assert ranked.index(54) < ranked.index(51)  # white rice before fried rice
-    assert ranked.index(58) < ranked.index(56)  # plain long-grain before rice with coconut milk
-    assert ranked.index(51) < ranked.index(57)  # fried rice before fried rice with chicken
-    assert ranked[-2:] == [59, 60]              # rice noodles and rice milk last
+    assert ranked[0] == 52
+    assert ranked.index(54) < ranked.index(51)
+    assert ranked.index(58) < ranked.index(56)
+    assert ranked.index(51) < ranked.index(57)
+    assert ranked[-2:] == [59, 60]
 
 
-# Real USDA results for "salmon" and "bread" (generic part), in USDA's order.
 SALMON = [food(71, "Salmon, sockeye, canned, total can contents"),
           food(72, "Salmon, red (sockeye), filets with skin, smoked (Alaska Native)"),
           food(73, "Salmon nuggets, cooked as purchased, unheated", "Survey (FNDDS)"),
@@ -146,9 +142,9 @@ BREAD = [food(81, "Bread, sticks, plain"), food(82, "Bread, whole wheat", "Surve
 
 def test_raw_salmon_comes_first_even_though_usda_names_it_fish_salmon():
     ranked = ids(rank_foods(SALMON, "salmon"))
-    assert ranked[0] == 75                      # "Fish, salmon, raw"
-    assert ranked.index(76) < ranked.index(71)  # raw before canned
-    assert ranked.index(71) < ranked.index(73)  # canned salmon before salmon nuggets
+    assert ranked[0] == 75
+    assert ranked.index(76) < ranked.index(71)
+    assert ranked.index(71) < ranked.index(73)
 
 
 def test_bread_puts_a_loaf_bread_before_breadsticks_and_crumbs():

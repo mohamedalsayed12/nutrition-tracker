@@ -22,7 +22,6 @@ from services.weekly_recap import food_macros
 
 MASS_GRAMS = {"g": 1.0, "kg": 1000.0, "oz": 28.349523125, "lb": 453.59237}
 VOLUME_ML = {"ml": 1.0, "l": 1000.0}
-# Spoken unit -> words to look for in a USDA serving label.
 LABEL_WORDS = {
     "cup": ("cup",), "tbsp": ("tbsp", "tablespoon"), "tsp": ("tsp", "teaspoon"),
     "slice": ("slice",), "piece": ("piece", "pc"), "bar": ("bar",), "scoop": ("scoop",),
@@ -32,9 +31,6 @@ LABEL_WORDS = {
 }
 
 
-# Foods people eat cooked: when Siri hears "a cup of rice" or "200 g of chicken",
-# a cooked entry is chosen over raw, since raw rice has about 3x the calories
-# per gram and raw meat weighs more than the cooked portion on the plate.
 USUALLY_COOKED = {
     "rice", "pasta", "spaghetti", "noodle", "macaroni", "quinoa", "couscous", "oat", "porridge", "bean",
     "lentil", "chickpea", "potato", "chicken", "beef", "steak", "pork", "lamb", "turkey", "mince",
@@ -83,13 +79,10 @@ def _match_food(user_id, client, item):
     found = _find_foods(client, query, raw_first=False)
     candidates = [food for food in found if food.data_type != "Branded"][:8] or found[:8]
     query_words = words(query)
-    # Only foods whose name starts with what was said: "Rice, cooked", not "Rice milk"
-    # for "rice" and never "Coconut milk" for "milk".
     good = [food for food in candidates if _match_tier(food.description, query_words) <= 1]
     if not good:
         return None
     if USUALLY_COOKED & set(query_words) and not ({"raw"} & set(query_words)):
-        # Stable sort: cooked entries first, otherwise keep the ranking.
         good.sort(key=lambda food: 0 if COOKED_WORDS & set(words(food.description)) else 1)
     logged_before = _previously_logged(user_id, [food.fdc_id for food in good[:5]])
     chosen = next((food for food in good[:5] if food.fdc_id in logged_before), good[0])
@@ -116,7 +109,7 @@ def _grams(food, item):
             return ml * per_ml["grams"], f"{ml:g} ml"
         if cup:
             return ml * cup["grams"] / 236.5882365, f"{ml:g} ml"
-        return ml, f"{ml:g} ml"  # water-like density when USDA gives no volume
+        return ml, f"{ml:g} ml"
     if item.unit:
         measure = _find_label(portions, LABEL_WORDS.get(item.unit, (item.unit,)))
         if measure:

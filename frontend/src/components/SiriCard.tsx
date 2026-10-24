@@ -15,11 +15,6 @@ function browserTimeZone(): string {
   }
 }
 
-/**
- * Sets up "Hey Siri, log food" with an iPhone Shortcut. The Shortcut sends what
- * was said to /api/v1/voice-log with a personal key, and Siri reads back what
- * was logged and the calories left today.
- */
 export function SiriCard() {
   const queryClient = useQueryClient()
   const toast = useToast()

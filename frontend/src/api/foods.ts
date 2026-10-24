@@ -22,7 +22,6 @@ export function searchExercises(query: string): Promise<ExerciseSearchResponse> 
   return request<ExerciseSearchResponse>("/exercises", { query: { q: query }, auth: false })
 }
 
-/** Score is not in the OpenAPI spec yet, so this stays on the mock until the backend adds the route. */
 export function getFoodScore(fdcId: number, grams: number): Promise<FoodScore> {
   return mockFoodScore(fdcId, grams)
 }

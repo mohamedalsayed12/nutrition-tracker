@@ -15,7 +15,6 @@ import { mealOptions } from "../lib/meals.ts"
 import { gramsFromServing } from "../lib/servings.ts"
 import type { FoodMeasure, FoodSummary, Meal } from "../types/api.ts"
 
-// The camera code is only downloaded when someone taps "Scan barcode".
 const BarcodeScanner = lazy(() => import("../components/food/BarcodeScanner.tsx"))
 
 function prefetchMeasures(queryClient: ReturnType<typeof useQueryClient>, fdcId: number) {
@@ -26,7 +25,6 @@ function prefetchMeasures(queryClient: ReturnType<typeof useQueryClient>, fdcId:
   })
 }
 
-/** A food picked from search, or found by barcode (which arrives with its servings). */
 type Selected = FoodSummary & { measures?: FoodMeasure[]; source?: string }
 
 export function AddFoodPage() {
@@ -54,14 +52,10 @@ export function AddFoodPage() {
     queryKey: ["foods", "search", debounced.toLowerCase()],
     queryFn: () => searchFoods(debounced),
     enabled: debounced.length >= 2,
-    // Keep the last results on screen while the next search loads, and reuse
-    // results for 30 minutes (USDA data doesn't change during a session).
     placeholderData: keepPreviousData,
     staleTime: 30 * 60 * 1000,
   })
 
-  // Load serving sizes for the top results in the background, so tapping one
-  // opens the quantity panel straight away.
   useEffect(() => {
     for (const food of search.data?.foods.slice(0, 5) ?? []) {
       if (food.fdc_id != null) void prefetchMeasures(queryClient, food.fdc_id)
@@ -186,9 +180,6 @@ export function AddFoodPage() {
   )
 }
 
-// Opens over the search results as soon as a food is tapped: a sheet from the
-// bottom on phones, a centred panel on larger screens. Quantity and serving sit
-// on one row with the Log button under them, so nothing needs scrolling.
 function ServingSheet({
   food,
   meal,

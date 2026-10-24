@@ -20,32 +20,20 @@ Duplicates of the same food from different USDA datasets ("Bananas, raw" and
 
 import re
 
-# Words that make a food a processed or unusual variant. A food is pushed down
-# for each one it contains that the search did not ask for.
 UNUSUAL = {
     "baby", "infant", "toddler", "formula", "human", "dessert", "candied", "candy", "candies",
     "pie", "cake", "cookie", "cracker", "pudding", "supplement", "substitute", "imitation",
     "bar", "snack", "cereal", "flavored", "flavor", "usda", "commodity", "school", "lunch",
-    # Words that make it a different product from the plain food: bread sticks,
-    # breadcrumbs, salmon nuggets, salmon salad, chicken sandwich.
     "stick", "crumb", "stuffing", "crouton", "chip", "nugget", "salad", "sandwich", "dip",
 }
-# USDA puts a category in front of some names: "Fish, salmon, raw", "Nuts,
-# almonds", "Spices, pepper, black". The category is skipped when matching.
 CATEGORY_PREFIXES = {"fish", "nut", "seed", "spice", "beverage", "crustacean", "mollusk"}
 PROCESSED = {
     "canned", "dried", "dehydrated", "frozen", "juice", "sauce", "breaded", "coated", "glazed",
     "sweetened", "syrup", "powder", "concentrate", "malted", "evaporated", "condensed",
     "pickled", "smoked", "spread", "mix", "prepared", "fat-free", "nonfat", "light", "fried",
 }
-# Small words that don't make a name more specific, so they are not counted as
-# extra words. "with" and "and" do mark a mixed dish ("Rice, cooked with milk"),
-# which counts as a processed variant instead.
 FILLER = {"with", "and", "or", "as", "to", "from", "of", "in", "the", "a", "ns", "nfs", "made", "type"}
 MIXED_DISH = {"with", "and"}
-# Words that describe the plain, everyday version of a food. "Raw", "whole" and
-# "plain" are the most typical choice; a cooking method or "NFS" (not further
-# specified) is a good generic match but slightly less so.
 EVERYDAY = {"raw": 2, "whole": 2, "plain": 2, "fresh": 2,
             "cooked": 1, "boiled": 1, "baked": 1, "roasted": 1, "nfs": 1, "white": 1}
 
@@ -85,31 +73,23 @@ def _match_tier(description, query_words):
         segments = segments[1:]
     first_words = segments[0] if segments else []
     if not first_words or first_words[0] != query_words[0]:
-        return 2  # the name only contains the search, e.g. "Goat milk"
+        return 2
     head = set(first_words) | (set(segments[1]) if len(segments) > 1 and len(first_words) == 1 else set())
     if set(query_words) <= head and len(set(first_words) - set(query_words)) == 0:
-        return 0  # "Milk, whole", "Chicken, breast, raw", "Chicken breast, grilled"
-    return 1      # starts with the search but adds words, e.g. "Milk shake"
+        return 0
+    return 1
 
 
 def rank_key(food, query_words, raw_first=False):
-    # Text in brackets is a USDA note, e.g. "(Includes foods for USDA's Food
-    # Distribution Program)", not part of the food's name.
     description = re.sub(r"\([^)]*\)", "", food.description or "").strip()
-    # "Chicken breast, baked, ..., from raw" says how USDA sampled a cooked food;
-    # it is not a raw food.
     description = re.sub(r",?\s*from (?:raw|pre-cooked|frozen|fresh|canned|dry|dried)\b", "", description, flags=re.IGNORECASE)
     food_words = set(words(description))
     asked = set(query_words)
     unusual = sum(1 for word in food_words - asked if word in UNUSUAL)
     processed = sum(1 for word in food_words - asked if word in PROCESSED)
     processed += 1 if (food_words - asked) & MIXED_DISH else 0
-    # Added up, so "white" and "raw" together beat "raw" alone ("Rice, white, raw"
-    # before "Rice, black, raw").
     everyday = sum(EVERYDAY.get(word, 0) for word in food_words - asked)
     extra_words = len(food_words - asked - FILLER)
-    # In the search box raw foods come first ("Rice, white, raw" before "Rice,
-    # cooked"); Siri keeps the everyday order, since "a cup of rice" means cooked.
     raw_rank = 0 if (raw_first and "raw" in food_words - asked) else 1
     return (
         _match_tier(description, query_words),
@@ -136,7 +116,6 @@ def rank_foods(foods, query, raw_first=True):
 
     generic, branded, seen = [], [], set()
     for food in candidates:
-        # Identical branded names ("RICE" from five shops) are shown once.
         key = (_same_food_key(food) if food.data_type != "Branded"
                else ("branded", (food.description or "").lower(), (getattr(food, "brand_name", None) or "").lower()))
         if key in seen:

@@ -1,4 +1,3 @@
-/** Request bodies follow frontend/openapi.json. Response bodies are not in that spec. */
 
 export type Meal = "breakfast" | "lunch" | "dinner" | "snack"
 
@@ -139,14 +138,12 @@ export type HealthSettings = {
 export type HealthSettingsRequest = Omit<HealthSettings, "guidance">
 
 export type FoodSummary = {
-  /** USDA id; null for a packaged food found only on Open Food Facts (then barcode is set). */
   fdc_id: number | null
   barcode?: string | null
   description: string
   data_type: string
   brand_name: string | null
   gtin_upc: string | null
-  /** True when the signed-in user has logged this food before; these come first. */
   previously_logged?: boolean
 }
 
@@ -158,7 +155,6 @@ export type FoodMeasure = {
   code: string
   label: string
   grams: number
-  /** The serving to pre-select, e.g. "1 medium" (household portions come first). */
   default?: boolean
 }
 
@@ -220,7 +216,6 @@ export type ApiToken = {
 }
 
 export type NewApiToken = ApiToken & {
-  /** Shown once; only a hash is stored. */
   key: string
 }
 
@@ -322,14 +317,12 @@ export type DailyReport = {
   iron_absorption: IronAbsorptionCheck[]
 }
 
-/** One meal with a meaningful amount of iron, and whether it has vitamin C to help absorb it. */
 export type IronAbsorptionCheck = {
   meal: "breakfast" | "lunch" | "dinner" | "snack"
   iron_mg: number
   vitamin_c_mg: number | null
   status: "add_vitamin_c" | "good"
   tip: string
-  /** True when periods are selected, so the tip is shown more prominently. */
   highlight: boolean
 }
 

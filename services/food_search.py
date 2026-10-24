@@ -77,7 +77,6 @@ class _TtlCache:
 
 
 _cache = _TtlCache()
-# The three searches for one query (lab-analysed, survey, branded) run at the same time.
 _pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="usda")
 
 
@@ -91,7 +90,6 @@ def get_food_client():
 GENERIC_TYPES = ["Foundation", "SR Legacy", "Survey (FNDDS)"]
 
 
-# Everyday and British words -> the words USDA uses in its names.
 SYNONYMS = {
     "toast": "bread toasted", "toasts": "bread toasted",
     "crisps": "potato chips", "crisp": "potato chips",
@@ -125,13 +123,7 @@ def _find_foods(client, query, raw_first=True):
         return [food for food in results
                 if (food.gtin_upc or "").lstrip("0") == query.lstrip("0")][:20]
 
-    # Generic and branded foods are fetched separately so the thousands of branded
-    # products cannot crowd everyday foods out of the results. If USDA rejects the
-    # filtered searches, fall back to one unfiltered search rather than failing.
     try:
-        # Lab-analysed foods (SR Legacy, Foundation) are fetched on their own: they
-        # hold the plain raw entries ("Rice, white, long-grain, raw"), which USDA's
-        # relevance order otherwise pushes behind dozens of Survey dishes.
         jobs = [_pool.submit(client.search, query, data_type=types, page_size=size)
                 for types, size in ((["SR Legacy", "Foundation"], 60), (["Survey (FNDDS)"], 60), (["Branded"], 25))]
         analysed, survey, branded = (list(job.result(timeout=20).foods) for job in jobs)
@@ -142,8 +134,6 @@ def _find_foods(client, query, raw_first=True):
     ranked = rank_foods(generic + branded, query, raw_first)
     query_words = words(query)
     if len(query_words) > 1 and sum(food.data_type != "Branded" for food in ranked) < 5:
-        # A multi-word search can miss foods USDA indexes differently, so widen
-        # the search to the first word and keep only full matches.
         try:
             broader = list(client.search(query_words[0], data_type=GENERIC_TYPES, page_size=100).foods)
         except Exception:
@@ -164,7 +154,6 @@ def search_foods(query, user_id=None):
     except Exception:
         abort(502, description="Food search is temporarily unavailable.")
     logged = _previously_logged(user_id, [food.fdc_id for food in ordered])
-    # Like Cronometer, foods you have logged before come first; the rest keep their ranking.
     ordered = sorted(ordered, key=lambda food: food.fdc_id not in logged)
     return [dict(fdc_id=food.fdc_id, description=food.description,
                  data_type=food.data_type, brand_name=food.brand_name,

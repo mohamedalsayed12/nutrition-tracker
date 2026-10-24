@@ -92,8 +92,6 @@ class FoodLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.uid"), nullable=False, index=True)
     meal = db.Column(db.String(20), nullable=False)
-    # USDA foods have an FDC id; packaged foods found only on Open Food Facts are
-    # identified by their barcode instead.
     fdc_id = db.Column(db.Integer, nullable=True)
     barcode = db.Column(db.String(14), nullable=True)
     food_name = db.Column(db.String(300), nullable=False)
@@ -160,7 +158,6 @@ class ApiToken(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.uid", ondelete="CASCADE"), nullable=False, index=True)
     token_hash = db.Column(db.String(64), nullable=False, unique=True)
     name = db.Column(db.String(60), nullable=False)
-    # The phone's time zone when the key was made, so "today" and the meal match the user's clock.
     timezone = db.Column(db.String(64), nullable=False, default="UTC")
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     last_used_at = db.Column(db.DateTime, nullable=True)

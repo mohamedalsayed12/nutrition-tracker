@@ -47,8 +47,6 @@ class RegistrationForm(FlaskForm):
     password = PasswordField("Password", validators=[DataRequired()])
 
 
-# The original server-rendered pages. The React app (frontend/) is the main
-# interface, so these live under /classic.
 CLASSIC = "/classic"
 
 

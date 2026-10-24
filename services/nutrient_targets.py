@@ -121,8 +121,6 @@ PREGNANCY_TARGETS = {
 }
 
 
-# Not tracked: few foods in USDA or on labels report them, so the bars would sit
-# at 0 and mislead. Saved overrides for them are ignored.
 UNTRACKED = {"Biotin (B7)", "Chloride", "Chromium", "Fluoride", "Iodine", "Molybdenum"}
 
 

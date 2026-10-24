@@ -83,5 +83,5 @@ def test_usda_answers_are_cached(monkeypatch):
     for _ in range(3):
         assert client.search("Banana ", data_type=["SR Legacy"]).foods[0].fdc_id == 5
         assert client.get_food(5).description == "Bananas, raw"
-    assert len(calls) == 2  # one search and one food lookup; the rest came from memory
+    assert len(calls) == 2
     food_search._cache.clear()

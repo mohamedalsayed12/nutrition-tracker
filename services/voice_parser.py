@@ -21,7 +21,6 @@ NUMBER_WORDS = {
     "dozen": 12, "one and a half": 1.5, "two and a half": 2.5, "a single": 1, "some": None,
 }
 
-# Spoken unit -> the unit code the serving matcher understands.
 UNITS = {
     "g": "g", "gram": "g", "grams": "g", "gramme": "g", "grammes": "g",
     "kg": "kg", "kilo": "kg", "kilos": "kg", "kilogram": "kg", "kilograms": "kg",
@@ -53,7 +52,6 @@ LEAD_INS = re.compile(
 _NUMBER = r"\d+\s+\d+\s*/\s*\d+|\d+\s*/\s*\d+|\d+(?:\.\d+)?"
 _WORD_NUMBERS = "|".join(sorted((re.escape(w) for w in NUMBER_WORDS), key=len, reverse=True))
 _UNIT_WORDS = "|".join(sorted((re.escape(w) for w in UNITS), key=len, reverse=True))
-# Digits may run straight into a unit ("200g"); number words need a word break.
 _QUANTITY = re.compile(rf"^(?:(?P<num>{_NUMBER})(?=[a-z\s]|$)|(?P<word>{_WORD_NUMBERS})\b)\s*", re.IGNORECASE)
 _UNIT = re.compile(rf"^(?P<unit>{_UNIT_WORDS})\b\.?\s*(?:of\s+)?", re.IGNORECASE)
 _STARTS_WITH_AMOUNT = re.compile(rf"^(?:{_NUMBER}|{_WORD_NUMBERS})\b", re.IGNORECASE)
@@ -61,10 +59,10 @@ _STARTS_WITH_AMOUNT = re.compile(rf"^(?:{_NUMBER}|{_WORD_NUMBERS})\b", re.IGNORE
 
 @dataclass
 class SpokenItem:
-    quantity: float | None   # None: "some", or no amount given
-    unit: str | None         # a code from UNITS, or None for the food's usual serving
+    quantity: float | None
+    unit: str | None
     food: str
-    said: str                # the words this item came from, for the reply
+    said: str
 
 
 def parse_meal_text(text):
@@ -82,7 +80,6 @@ def parse_meal_text(text):
 
 
 def _take_meal(text):
-    # "tea" only counts as a meal after "for" ("for tea"); "a cup of tea" is a drink.
     pattern = re.compile(r"\b(?:(?:for|at|during|as(?:\s+a)?|my)\s+(breakfast|brunch|lunch|dinner|supper|snacks?|dessert)|for\s+(tea))\b",
                          re.IGNORECASE)
     match = pattern.search(text)
@@ -124,9 +121,7 @@ def _parse_item(chunk):
     if match:
         quantity = _number(match.group("num") or match.group("word"))
         rest = rest[match.end():]
-        # "one and a half cups", "2 1/2 cups" are covered by the patterns; "a half" handled above.
     unit = None
-    # "a 330ml can of coke", "two 500 ml bottles of water": the size wins over the container.
     sized = _QUANTITY.match(rest)
     if sized and sized.group("num"):
         size_unit = _UNIT.match(rest[sized.end():])
@@ -140,7 +135,6 @@ def _parse_item(chunk):
     if match:
         unit = UNITS[match.group("unit").lower()]
         rest = rest[match.end():]
-        # "a medium banana" -> size; "2 slices of large bread" keeps the first unit only.
     rest = re.sub(r"^(?:of\s+)", "", rest, flags=re.IGNORECASE)
     food = re.sub(r"[^\w\s%'-]", " ", rest)
     food = " ".join(food.split()).strip()

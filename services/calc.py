@@ -6,7 +6,6 @@ from services.nutrient_targets import apply_menstruation_targets, micronutrient_
 from services.weekly_recap import food_macros
 
 
-# Activity multipliers for total daily energy expenditure (TDEE = BMR x factor).
 ACTIVITY_FACTORS = {
     "sedentary": 1.2,
     "lightly active": 1.375,
@@ -34,13 +33,6 @@ def mifflin_st_jeor_bmr(weight_kg, height_cm, age, sex):
     raise ValueError('Sex must be "male" or "female".')
 
 
-# Protein per kg of body weight for the minimum target.
-# - 0.8 g/kg: the adult RDA (National Academies, Dietary Reference Intakes).
-# - 0.85 g/kg at age 18: the RDA for ages 14-18.
-# - 1.0 g/kg from age 65: PROT-AGE and ESPEN advice for older adults, to limit muscle loss.
-# - 1.2 g/kg when losing weight: helps keep muscle in a calorie deficit.
-# - 1.6 g/kg when gaining weight: where extra protein stops adding muscle in
-#   resistance training (Morton et al., 2018 meta-analysis).
 PROTEIN_GOAL_MINIMUM_PER_KG = {"maintain": 0.0, "lose_weight": 1.2, "gain_weight": 1.6}
 
 
@@ -128,7 +120,6 @@ def apply_health_preferences(nutrition, preferences):
     if calories is None and "pregnancy" not in (preferences.conditions or []):
         calories = preferences.base_calories
     if preferences.custom_calories is not None:
-        # The weight-based minimum stays; only the 35%-of-calories maximum follows the care plan.
         nutrition.protein_min = (preferences.base_protein_min if preferences.base_protein_min is not None
                                  else round(calories * 0.10 / 4, 1))
         nutrition.protein_max = protein_maximum(calories, nutrition.protein_min)
@@ -290,20 +281,13 @@ def _portion_volume_ml(description, amount=1):
     return key, quantity * _VOLUME_ML[key]
 
 
-# Portion words that describe a cut or prepared shape. A volume measured this way
-# ("1 cup, sliced") cannot be turned into tablespoons or millilitres sensibly.
 _CUT_WORDS = re.compile(r"slice|chop|dice|cube|piece|half|halves|quarter|shred|grate|mash|"
                         r"floret|strip|wedge|ring|spear|stalk|packed|crumble|whole", re.IGNORECASE)
 _PLACEHOLDER_UNITS = {"undetermined", "unit", "units", ""}
 
 
-# FNDDS lists reference amounts that are not servings anyone eats, such as
-# "Guideline amount per fl oz of beverage" (2.5 g for milk). They are skipped.
 _SKIPPED_PORTIONS = ("quantity not specified", "guideline amount")
-# USDA jargon for a standard serving: Reference Amount Customarily Consumed, and
-# the Nutrition Labeling and Education Act serving.
 _SERVING_JARGON = re.compile(r"^\s*1\s+(?:RACC|NLEA serving)\s*$", re.IGNORECASE)
-# Portions that are a package size rather than a normal helping, so they are not pre-selected.
 _NOT_A_DEFAULT = re.compile(r"\b(?:container|package|school|can|bunch|jar|bottle|loaf)\b", re.IGNORECASE)
 
 
@@ -410,8 +394,6 @@ def daily_target_progress(today_food_logs, daily_calorie_target, exercise_credit
     if getattr(preferences, "custom_fat", None) is not None:
         fat_range = (preferences.custom_fat, preferences.custom_fat)
     custom_macros = custom_macro_targets(daily_calorie_target, macro_split, preferences)
-    # Extra exercise raises the calorie target, so the 35% maximum rises with it; the
-    # weight-based minimum does not change.
     protein_min = nutrition.protein_min if nutrition is not None else None
     protein_max = (protein_maximum(daily_calorie_target, protein_min) if exercise_credit_today and nutrition is not None
                    else nutrition.protein_max if nutrition is not None else None)

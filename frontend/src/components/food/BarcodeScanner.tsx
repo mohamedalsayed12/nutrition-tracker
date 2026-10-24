@@ -4,20 +4,12 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "../ui/Button.tsx"
 import { Input } from "../ui/Input.tsx"
 
-// Supermarket barcodes: EAN-13 (UK/Europe), UPC-A/E (US), EAN-8 (small packs).
 const FORMATS = [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]
 
 function cameraAvailable(): boolean {
-  // mediaDevices is missing on plain HTTP and in some in-app browsers.
   return typeof navigator.mediaDevices?.getUserMedia === "function"
 }
 
-/**
- * Full-screen camera view that reads a food barcode with the back camera.
- * Works in Safari on iPhone and Chrome on Android (the site is served over
- * HTTPS, which browsers require for the camera). If the camera is blocked or
- * missing, the number printed under the barcode can be typed instead.
- */
 export default function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: string) => void; onClose: () => void }) {
   const video = useRef<HTMLVideoElement>(null)
   const [problem, setProblem] = useState(() => (cameraAvailable()

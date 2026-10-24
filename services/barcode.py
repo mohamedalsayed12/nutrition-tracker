@@ -19,13 +19,10 @@ import requests
 logger = logging.getLogger(__name__)
 
 OPEN_FOOD_FACTS_URL = "https://world.openfoodfacts.org/api/v2/product/{code}.json"
-# Open Food Facts asks every app to identify itself.
 USER_AGENT = "health4everyone/1.0 (https://github.com/mohamedalsayed12/nutrition-tracker)"
 FIELDS = "code,product_name,product_name_en,generic_name,brands,nutriments,serving_quantity,serving_size,quantity"
 SOURCE = "Open Food Facts"
 
-# Open Food Facts nutriment -> (USDA nutrient name, USDA unit, factor from the OFF value).
-# OFF stores "_100g" values in grams (or kcal for energy), so mg = g x 1000, mcg = g x 1,000,000.
 NUTRIMENTS = (
     ("energy-kcal", "Energy", "kcal", 1),
     ("proteins", "Protein", "g", 1),
@@ -104,11 +101,11 @@ def open_food_facts_food(code, product):
             value = round(kj / 4.184, 1) if kj is not None else None
         if value is None and key == "sodium":
             salt = _number(nutriments.get("salt_100g"))
-            value = salt / 2.5 if salt is not None else None  # salt is 40% sodium
+            value = salt / 2.5 if salt is not None else None
         if value is not None:
             nutrients.append(SimpleNamespace(name=name, unit_name=unit, amount=round(value * factor, 4)))
     if not any(n.name == "Energy" for n in nutrients):
-        return None  # without calories the product can't be logged meaningfully
+        return None
     name = (product.get("product_name_en") or product.get("product_name") or product.get("generic_name") or "").strip()
     brand = (product.get("brands") or "").split(",")[0].strip() or None
     serving_grams = _number(product.get("serving_quantity"))

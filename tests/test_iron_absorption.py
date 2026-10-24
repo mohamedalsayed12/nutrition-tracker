@@ -28,8 +28,8 @@ def test_meal_with_iron_and_little_vitamin_c_gets_a_tip():
 
 
 def test_vitamin_c_counts_only_within_the_same_meal():
-    logs = [food("breakfast", iron_mg=0.5, vitamin_c_mg=80),   # orange juice at breakfast
-            food("dinner", iron_mg=3.0, vitamin_c_mg=0),        # lentils at dinner
+    logs = [food("breakfast", iron_mg=0.5, vitamin_c_mg=80),
+            food("dinner", iron_mg=3.0, vitamin_c_mg=0),
             food("dinner", iron_mg=1.0, vitamin_c_mg=5)]
     checks = iron_absorption_checks(logs)
     assert [(c["meal"], c["status"]) for c in checks] == [("dinner", "add_vitamin_c")]

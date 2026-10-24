@@ -29,7 +29,6 @@ def food(description, nutrients, portions=()):
                            serving_size=None, serving_size_unit=None, household_serving_fulltext=None)
 
 
-# USDA per 100 g: (FDC id, description, kcal, protein g, fat g, carbs g)
 REFERENCE = [
     (2709215, "Apple, raw", 61, 0.17, 0.15, 14.8),
     (173944, "Bananas, raw", 89, 1.09, 0.33, 22.8),
@@ -48,7 +47,7 @@ REFERENCE = [
 @pytest.mark.parametrize("grams", [100, 150, 37.5])
 def test_logged_macros_equal_usda_values_scaled_to_the_amount(fdc_id, description, kcal, protein, fat, carbs, grams):
     record = food(description, [
-        ("Energy", "kJ", round(kcal * 4.184)),           # USDA also lists kJ; it must not be read as kcal
+        ("Energy", "kJ", round(kcal * 4.184)),
         ("Energy", "kcal", kcal), ("Protein", "g", protein),
         ("Total lipid (fat)", "g", fat), ("Carbohydrate, by difference", "g", carbs),
     ])
@@ -62,10 +61,6 @@ def test_logged_macros_equal_usda_values_scaled_to_the_amount(fdc_id, descriptio
 
 @pytest.mark.parametrize("fdc_id, description, kcal, protein, fat, carbs", REFERENCE)
 def test_usda_calories_agree_with_protein_carbs_and_fat(fdc_id, description, kcal, protein, fat, carbs):
-    # A sanity check on the source data: 4/4/9 kcal per gram should land near
-    # USDA's energy value. USDA uses food-specific factors, and "carbohydrate by
-    # difference" includes fiber, which gives far fewer calories, so high-fiber
-    # vegetables such as broccoli come out about 20% above USDA's figure.
     assert 4 * protein + 4 * carbs + 9 * fat == pytest.approx(kcal, rel=0.22)
 
 
@@ -78,7 +73,6 @@ def test_foundation_food_uses_the_specific_atwater_energy():
     assert food_macros(scaled_food_nutrients(record, Decimal(100)))["Calories"] == 112
 
 
-# Apple, raw (FDC 2709215): the micronutrients, with USDA's own units.
 APPLE = food("Apple, raw", [
     ("Energy", "kcal", 61), ("Protein", "g", 0.17), ("Total lipid (fat)", "g", 0.15),
     ("Carbohydrate, by difference", "g", 14.8), ("Fiber, total dietary", "g", 2.1),
@@ -106,7 +100,6 @@ def test_microgram_nutrients_are_counted():
     assert eaten["Vitamin C"] == pytest.approx(9.2)
     assert eaten["Potassium"] == pytest.approx(208)
     assert eaten["Iron"] == pytest.approx(0.06)
-    # Every tracked nutrient USDA reports for the apple is matched.
     assert {"Vitamin A", "Vitamin C", "Vitamin D", "Vitamin E", "Vitamin K", "Vitamin B6", "Vitamin B12",
             "Thiamin (B1)", "Riboflavin (B2)", "Niacin (B3)", "Folate (B9)", "Choline", "Calcium", "Iron",
             "Magnesium", "Phosphorus", "Potassium", "Sodium", "Zinc", "Copper", "Selenium"} <= set(eaten)
@@ -116,7 +109,7 @@ def test_vitamin_d_in_international_units_is_converted():
     record = food("GREEK YOGURT", [("Vitamin D (D2 + D3), International Units", "IU", 400)])
     targets = micronutrient_targets(30, "female")
     eaten = matched_micronutrients(scaled_food_nutrients(record, Decimal(100)), targets, "eaten")
-    assert eaten["Vitamin D"] == pytest.approx(10)  # 400 IU = 10 mcg
+    assert eaten["Vitamin D"] == pytest.approx(10)
 
 
 def test_serving_weights_match_usda_portions():

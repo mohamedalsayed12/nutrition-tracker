@@ -1,8 +1,6 @@
 import type { ApiErrorDetail } from "../types/api.ts"
 import { clearToken, getToken } from "../lib/auth.ts"
 
-// A production build is served by Flask on the same address as the API, so it
-// calls its own origin; the dev server talks to a separately running API.
 const API_URL = (import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? "" : "http://localhost:5000")).replace(/\/$/, "")
 
 export class ApiError extends Error {

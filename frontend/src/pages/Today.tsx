@@ -231,11 +231,6 @@ function DiaryGroup({ title, subtotal, addTo, addLabel, ironCheck, children }: {
   )
 }
 
-/**
- * Shows when a meal has iron but little vitamin C. Vitamin C only helps iron
- * absorption when it is eaten in the same meal, so this is checked per meal.
- * A meal that already pairs them is only mentioned when periods are selected.
- */
 function IronTip({ check }: { check: IronAbsorptionCheck }) {
   if (check.status === "good" && !check.highlight) return null
   const needsVitaminC = check.status === "add_vitamin_c"
@@ -512,7 +507,6 @@ function ConditionsGroup({ settings }: { settings: HealthSettings }) {
 
 type MicronutrientItem = { name: string; unit: string; logged: number | null; target: number; percent: number | null; bar_width: number; limit: boolean; partial: boolean }
 
-// The ones most people are short of (or over, for sodium), shown when the section is opened.
 const KEY_NUTRIENTS = ["Vitamin D", "Vitamin C", "Vitamin B12", "Iron", "Calcium", "Magnesium", "Potassium", "Sodium"]
 const VITAMIN_PREFIXES = ["Vitamin", "Thiamin", "Riboflavin", "Niacin", "Pantothenic", "Folate", "Choline"]
 const MICRO_VIEW_KEY = "nutrition.micronutrients_view"
@@ -532,7 +526,7 @@ function Micronutrients({ items }: { items: MicronutrientItem[] }) {
   if (items.length === 0) return null
   const setView = (next: MicroView) => {
     setViewState(next)
-    try { localStorage.setItem(MICRO_VIEW_KEY, next) } catch { /* private mode */ }
+    try { localStorage.setItem(MICRO_VIEW_KEY, next) } catch {  }
   }
   const open = view !== "closed"
   const goals = items.filter((item) => !item.limit)

@@ -16,8 +16,6 @@ def food_macros(nutrients):
         unit = str(nutrient.get("unit", "")).lower().strip()
         key = priority = None
         if unit == "kcal" and name.startswith("energy"):
-            # Plain "Energy" first; Foundation foods give Atwater values, where the
-            # food-specific factors are more accurate than the general 4/4/9.
             key, priority = "Calories", 0 if name == "energy" else 1 if "specific" in name else 2
         elif unit == "g" and name == "protein":
             key, priority = "Protein", 0

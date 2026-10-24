@@ -17,17 +17,10 @@ from services.nutrient_scoring import _convert, _target_name
 
 MEALS = ("breakfast", "lunch", "dinner", "snack")
 
-# A meal with at least this much iron is worth checking. Smaller amounts make
-# little difference to the day either way.
 IRON_WORTH_CHECKING_MG = 2.0
 
-# About the vitamin C in half an orange or a few slices of red pepper. Studies of
-# non-heme iron absorption show a clear increase from roughly this amount upwards.
 VITAMIN_C_HELPFUL_MG = 25.0
 
-# The tips only show for health settings that raise iron needs: periods (iron lost
-# each month) and pregnancy (27 mg/day). Everyone else's iron target is easily met
-# without planning meals around it, so the tips would just be noise.
 IRON_CONDITIONS = {"menstruation", "pregnancy"}
 
 VITAMIN_C_IDEAS = "red or yellow pepper, an orange, kiwi, strawberries, tomato or broccoli"

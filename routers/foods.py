@@ -13,7 +13,6 @@ router = Blueprint("foods", __name__)
 @router.get("/foods")
 @jwt_required(optional=True)
 def foods():
-    # API clients sign in with a token; the web pages sign in with a session.
     identity = get_jwt_identity()
     if identity:
         user_id = int(identity)

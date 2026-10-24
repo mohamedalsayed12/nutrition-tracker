@@ -47,15 +47,12 @@ def _target_name(value):
 
 
 def _unit(value):
-    # USDA writes micrograms as "µg" (micro sign) in full food records and "UG" in
-    # abridged ones; the Greek mu and some mis-encoded forms also turn up.
     unit = str(value).lower().strip()
     for micro in ("\u00b5", "\u03bc", "Ã‚Âµ", "ÃŽÂ¼", "Ã¯Â¿Â½", "Âµ", "Î¼"):
         unit = unit.replace(micro, "u")
     return unit
 
 
-# Branded labels can give vitamin D in International Units: 1 IU = 0.025 mcg.
 VITAMIN_D_MCG_PER_IU = 0.025
 
 

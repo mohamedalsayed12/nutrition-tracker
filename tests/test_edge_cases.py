@@ -38,8 +38,6 @@ def sign_up(client, email):
     return headers
 
 
-# --- Open Food Facts over the network ----------------------------------------------------
-
 class FakeResponse:
     def __init__(self, status, body=None):
         self.status_code, self.body = status, body
@@ -89,8 +87,6 @@ def test_usda_barcode_search_failure_is_treated_as_no_match():
     assert barcode.find_usda_barcode(Broken(), "5000157024671") is None
 
 
-# --- Siri amounts ------------------------------------------------------------------------------
-
 MILK = usda(1, "Milk, whole", [p("1 cup", 244)], kcal=61)
 OIL = usda(2, "Oil, olive", [p("1 tbsp", 13.5)], kcal=884)
 WATER = usda(3, "Water, tap")
@@ -104,15 +100,15 @@ def grams(food, said):
 
 def test_millilitres_use_the_foods_own_density():
     assert grams(MILK, "250 ml of milk") == pytest.approx(250 * 244 / 236.588, rel=0.01)
-    assert grams(WATER, "500 ml of water") == 500   # no USDA volume: 1 g per ml
+    assert grams(WATER, "500 ml of water") == 500
     assert grams(MILK, "a litre of milk") == pytest.approx(1000 * 244 / 236.588, rel=0.01)
 
 
 def test_spoken_units_match_usda_servings_or_fall_back_to_the_default():
     assert grams(OIL, "two tablespoons of olive oil") == 27
     assert grams(PIZZA, "3 slices of pizza") == 321
-    assert grams(PIZZA, "a bowl of pizza") == 107          # no bowl serving: the usual serving
-    assert grams(WATER, "a water") == 100                  # no servings at all: 100 g
+    assert grams(PIZZA, "a bowl of pizza") == 107
+    assert grams(WATER, "a water") == 100
     assert grams(MILK, "8 oz of milk") == pytest.approx(226.8, rel=0.001)
 
 
@@ -135,8 +131,6 @@ def test_siri_skips_a_food_usda_cannot_return(monkeypatch):
     assert voice_log._match_food(1, SimpleNamespace(get_food=broken), item) is None
 
 
-# --- Siri keys -------------------------------------------------------------------------------
-
 def test_siri_key_limit_and_bad_keys(client):
     headers = sign_up(client, "limit@example.com")
     for _ in range(5):
@@ -157,8 +151,6 @@ def test_voice_log_needs_food_search_configured(client, monkeypatch):
     response = client.post("/api/v1/voice-log", json={"text": "an egg"}, headers={"Authorization": f"Bearer {key}"})
     assert response.status_code == 503
 
-
-# --- Removed nutrients ---------------------------------------------------------------------------
 
 def test_removed_nutrients_are_not_targets_for_anyone():
     for age, sex, pregnant in ((25, "male", False), (30, "female", False), (30, "female", True), (70, "male", False)):
@@ -182,14 +174,12 @@ def test_saved_targets_and_overrides_for_removed_nutrients_are_ignored(client, a
     assert unknown.status_code in (400, 422)
 
 
-# --- Protein with a care-plan calorie target ----------------------------------------------------------
-
 def test_care_plan_calories_keep_the_weight_based_protein_minimum():
     nutrition = SimpleNamespace(age=30, sex="female", protein_min=0, protein_max=0, carbs=0, micronutrients=[])
     preferences = SimpleNamespace(conditions=[], custom_calories=1600, base_calories=2000, custom_carbs=None,
                                   custom_protein=None, custom_fat=None, base_carbs=275,
                                   base_protein_min=48.0, base_protein_max=175.0, micronutrient_overrides={})
     assert apply_health_preferences(nutrition, preferences) == 1600
-    assert nutrition.protein_min == 48.0                 # 0.8 g/kg x 60 kg, unchanged by the care plan
-    assert nutrition.protein_max == 140.0                # 35% of 1,600 kcal
-    assert nutrition.carbs == 220.0                      # 55% of 1,600 kcal
+    assert nutrition.protein_min == 48.0
+    assert nutrition.protein_max == 140.0
+    assert nutrition.carbs == 220.0
