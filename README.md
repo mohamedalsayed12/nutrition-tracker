@@ -1,8 +1,18 @@
-# Nutrition Tracker API
+# Nutrition Tracker (health4everyone)
 
-I'm building this nutrition tracker so people can log food and activity, set goals, and see how a day or week compares with those goals. I kept the backend separate so I can add a web or mobile app later without rebuilding the calculations.
+A full-stack nutrition tracker: people log food and activity, set goals, and see how a day or week compares with those goals. **Live app:** [Open the app](https://nutrition-tracker-alsayed-90b0d9adaf0f.herokuapp.com/)
 
-The backend uses Flask, PostgreSQL, and SQLAlchemy. It has server-rendered pages for login, registration, the meals log, targets and health settings (session login), plus a React frontend in `frontend/`. API clients sign in with JWT access tokens.
+**Stack:** Flask, PostgreSQL, SQLAlchemy, Alembic, Pydantic, React + TypeScript, Docker, GitHub Actions, Heroku.
+
+**Highlights**
+
+- Personalised calorie, macro and micronutrient targets from your own body and goal
+- USDA FoodData Central search, ranked so everyday foods come first
+- [Barcode scanning](#barcode-scanning) with an Open Food Facts fallback for UK and European products
+- [Log food with Siri](#log-food-with-siri): say what you ate and it is matched, logged and read back
+- [Installable on a phone](#using-it-on-a-phone) as a Progressive Web App
+
+The backend is a JSON API (JWT auth) kept separate from the React frontend in `frontend/`, so a mobile app could reuse the same calculations. The original server-rendered pages still work under `/classic`.
 
 ## What I've built so far
 
