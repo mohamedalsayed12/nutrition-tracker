@@ -21,6 +21,12 @@ const INITIAL = {
   goal: 'maintain',
 }
 
+const DEFAULT_SPLIT = {
+  carbs_percent: 45,
+  protein_percent: 25,
+  fat_percent: 30,
+}
+
 export default function Goals() {
   const navigate = useNavigate()
   const [form, setForm] = useState(INITIAL)
@@ -28,6 +34,7 @@ export default function Goals() {
   const [trimester, setTrimester] = useState(2)
   const [guidance, setGuidance] = useState([])
   const [preview, setPreview] = useState(null)
+  const [macroSplit, setMacroSplit] = useState(DEFAULT_SPLIT)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -36,10 +43,11 @@ export default function Goals() {
     let active = true
     async function load() {
       try {
-        const [me, nutrition, health] = await Promise.all([
+        const [me, nutrition, health, split] = await Promise.all([
           api.me(),
           api.getNutrition(),
           api.getHealth().catch(() => ({ conditions: [], trimester: null, guidance: [] })),
+          api.getMacroSplit().catch(() => ({ configured: false, ...DEFAULT_SPLIT })),
         ])
         if (!active) return
         const profile = me.profile || {}
@@ -54,6 +62,13 @@ export default function Goals() {
         setConditions(health.conditions || [])
         setTrimester(health.trimester || 2)
         setGuidance(health.guidance || [])
+        if (split.configured) {
+          setMacroSplit({
+            carbs_percent: Number(split.carbs_percent),
+            protein_percent: Number(split.protein_percent),
+            fat_percent: Number(split.fat_percent),
+          })
+        }
       } catch (err) {
         if (!active) return
         setError(err.message)
@@ -77,14 +92,14 @@ export default function Goals() {
   const macros = useMemo(() => {
     if (!preview) return null
     const calories = preview.calories
-    const proteinPct = 25
-    const carbsPct = 45
-    const fatPct = 30
+    const proteinPct = macroSplit.protein_percent
+    const carbsPct = macroSplit.carbs_percent
+    const fatPct = macroSplit.fat_percent
     const protein = calories * proteinPct / 100 / 4
     const carbs = calories * carbsPct / 100 / 4
     const fat = calories * fatPct / 100 / 9
     return { calories, protein, proteinPct, carbs, carbsPct, fat, fatPct }
-  }, [preview])
+  }, [preview, macroSplit])
 
   async function save(event) {
     event.preventDefault()
@@ -102,10 +117,13 @@ export default function Goals() {
       const result = await api.setNutrition(payload)
       const existingSplit = await api.getMacroSplit().catch(() => ({ configured: false }))
       if (!existingSplit.configured) {
-        await api.setMacroSplit({
-          carbs_percent: 45,
-          protein_percent: 25,
-          fat_percent: 30,
+        await api.setMacroSplit(DEFAULT_SPLIT)
+        setMacroSplit(DEFAULT_SPLIT)
+      } else {
+        setMacroSplit({
+          carbs_percent: Number(existingSplit.carbs_percent),
+          protein_percent: Number(existingSplit.protein_percent),
+          fat_percent: Number(existingSplit.fat_percent),
         })
       }
       // Drop sex-incompatible conditions after a sex change.
