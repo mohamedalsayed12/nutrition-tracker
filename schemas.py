@@ -4,6 +4,8 @@ from typing import Annotated, Literal
 from flask import request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator, model_validator
 
+from services.nutrient_targets import HEALTH_CONDITION_IDS
+
 
 PositiveAmount = Annotated[float, Field(gt=0, le=10000, allow_inf_nan=False)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
@@ -104,24 +106,7 @@ class MacroSplitInput(InputModel):
 
 
 DAY_SCOPED_CONDITIONS = Literal["menstruation"]
-HEALTH_CONDITIONS = Literal[
-    "pregnancy",
-    "lactation",
-    "menstruation",
-    "menopause",
-    "diabetes",
-    "ibs",
-    "celiac",
-    "crohn_ibd",
-    "vegan",
-    "vegetarian",
-    "anemia_iron",
-    "osteoporosis",
-    "hypertension",
-    "kidney_disease",
-    "bariatric",
-    "thyroid",
-]
+HEALTH_CONDITIONS = Literal[*HEALTH_CONDITION_IDS]
 
 
 class HealthSettings(InputModel):

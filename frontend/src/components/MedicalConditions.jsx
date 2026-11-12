@@ -20,6 +20,10 @@ export const MEDICAL_CONDITIONS = [
   { id: 'kidney_disease', label: 'Chronic kidney disease', femaleOnly: false, group: 'Nutrient status' },
 ]
 
+export const FEMALE_ONLY_CONDITION_IDS = new Set(
+  MEDICAL_CONDITIONS.filter((item) => item.femaleOnly).map((item) => item.id),
+)
+
 const EXCLUSIVE_PAIRS = [
   ['pregnancy', 'menstruation'],
   ['pregnancy', 'lactation'],
@@ -50,10 +54,7 @@ export default function MedicalConditions({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const visible = MEDICAL_CONDITIONS.filter((item) => {
-    if (item.femaleOnly && sex !== 'female') return false
-    return true
-  })
+  const visible = MEDICAL_CONDITIONS.filter((item) => !item.femaleOnly || sex === 'female')
   const groups = [...new Set(visible.map((item) => item.group))]
 
   async function save(nextConditions, nextTrimester = trimester) {

@@ -3,13 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, macrosFromNutrients } from '../api'
 import BarcodeScanner from '../components/BarcodeScanner'
 import { formatNumber } from '../lib/format'
+import { MEALS, normalizeMeal } from '../lib/meals'
 import { getSpeechRecognition, speechSupported } from '../lib/speech'
-
-const MEALS = ['breakfast', 'lunch', 'dinner']
-
-function normalizeMeal(value) {
-  return MEALS.includes(value) ? value : 'dinner'
-}
 
 export default function AddFood() {
   const navigate = useNavigate()
@@ -144,47 +139,7 @@ export default function AddFood() {
     }
   }, [chooseFood, meal, navigate])
 
-  useEffect(() => {
-    const transcript = params.get('transcript') || params.get('say') || params.get('q')
-    const barcode = params.get('barcode')
-    const autoLog = params.get('auto_log') === '1' || params.get('autolog') === '1'
-    const speak = params.get('speak') === '1'
-    if (barcode) {
-      lookupBarcode(barcode)
-      return
-    }
-    if (transcript) {
-      applyTranscript(transcript, { autoLog })
-      return
-    }
-    if (speak) {
-      // Defer so the page paints before the mic permission prompt.
-      window.setTimeout(() => {
-        const recognition = getSpeechRecognition()
-        if (!recognition) {
-          setError('Voice logging needs a browser with speech recognition (Chrome works best).')
-          return
-        }
-        setListening(true)
-        setStatus('Listening… tell me what you ate.')
-        recognition.onresult = (event) => {
-          const heard = event.results?.[0]?.[0]?.transcript || ''
-          setListening(false)
-          applyTranscript(heard, { autoLog })
-        }
-        recognition.onerror = () => {
-          setListening(false)
-          setError('Could not hear that. Try again, or type the food.')
-        }
-        recognition.onend = () => setListening(false)
-        recognition.start()
-      }, 250)
-    }
-    // Run once for deep-link / assistant handoff params.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  async function handleVoice() {
+  const startListening = useCallback((autoLog = false) => {
     const recognition = getSpeechRecognition()
     if (!recognition) {
       setError('Voice logging needs a browser with speech recognition (Chrome works best).')
@@ -194,10 +149,10 @@ export default function AddFood() {
     setVoiceNote('')
     setListening(true)
     setStatus('Listening… tell me what you ate.')
-    recognition.onresult = async (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || ''
+    recognition.onresult = (event) => {
+      const heard = event.results?.[0]?.[0]?.transcript || ''
       setListening(false)
-      await applyTranscript(transcript)
+      applyTranscript(heard, { autoLog })
     }
     recognition.onerror = () => {
       setListening(false)
@@ -205,6 +160,31 @@ export default function AddFood() {
     }
     recognition.onend = () => setListening(false)
     recognition.start()
+  }, [applyTranscript])
+
+  useEffect(() => {
+    const transcript = params.get('transcript') || params.get('say') || params.get('q')
+    const barcode = params.get('barcode')
+    const speak = params.get('speak') === '1'
+    // Deep links only preview. Auto-write stays on authenticated POST /food-logs/from-voice
+    // so a shared ?auto_log=1 URL cannot silently create logs in a signed-in browser.
+    if (barcode) {
+      lookupBarcode(barcode)
+      return
+    }
+    if (transcript) {
+      applyTranscript(transcript, { autoLog: false })
+      return
+    }
+    if (speak) {
+      // Defer so the page paints before the mic permission prompt.
+      window.setTimeout(() => startListening(false), 250)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deep-link handoff once on mount
+  }, [])
+
+  function handleVoice() {
+    startListening(false)
   }
 
   const portion = useMemo(() => {

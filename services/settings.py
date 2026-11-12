@@ -48,11 +48,11 @@ def set_health_settings(user_id, data):
                                         base_carbs=nutrition.carbs, base_protein_min=nutrition.protein_min,
                                         base_protein_max=nutrition.protein_max)
         db.session.add(preferences)
-    for name, value in data.model_dump().items():
+    # Partial PUTs (e.g. conditions-only from the UI) must not wipe care-plan fields.
+    for name, value in data.model_dump(exclude_unset=True).items():
         setattr(preferences, name, value)
-    preferences.conditions = sorted(set(data.conditions))
-    # apply_health_preferences → configured_micronutrients applies menstruation
-    # iron / vitamin C bumps (and pregnancy references) onto stored targets.
+    if "conditions" in data.model_fields_set:
+        preferences.conditions = sorted(set(data.conditions))
     calories = apply_health_preferences(nutrition, preferences)
     validate_care_plan_macros(calories, preferences)
     save_calorie_target(user_id, calories)

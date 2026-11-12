@@ -5,8 +5,7 @@ import CalorieRing from '../components/CalorieRing'
 import MacroBars from '../components/MacroBars'
 import MedicalConditions from '../components/MedicalConditions'
 import { formatDateHeading, formatNumber, progressRow } from '../lib/format'
-
-const MEALS = ['breakfast', 'lunch', 'dinner']
+import { MEALS } from '../lib/meals'
 
 function isSameDay(value, now = new Date()) {
   const logged = new Date(value)
