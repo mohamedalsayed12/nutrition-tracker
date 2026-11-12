@@ -243,4 +243,6 @@ def attach_food_recommendations(progress_rows):
 
 def deficiency_advice(progress_rows):
     """Return only nutrients that need food advice right now."""
+    if progress_rows and "deficient" in progress_rows[0]:
+        return [row for row in progress_rows if row.get("deficient")]
     return [row for row in attach_food_recommendations(progress_rows) if row.get("deficient")]

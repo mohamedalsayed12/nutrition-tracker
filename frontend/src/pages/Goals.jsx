@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, clearToken } from '../api'
-import MedicalConditions from '../components/MedicalConditions'
+import MedicalConditions, { FEMALE_ONLY_CONDITION_IDS } from '../components/MedicalConditions'
 import { formatNumber } from '../lib/format'
 
 const ACTIVITY = [
@@ -106,10 +106,9 @@ export default function Goals() {
         fat_percent: 30,
       })
       // Drop sex-incompatible conditions after a sex change.
-      const femaleOnly = new Set(['pregnancy', 'lactation', 'menstruation', 'menopause'])
-      if (form.sex === 'male' && conditions.some((item) => femaleOnly.has(item))) {
+      if (form.sex === 'male' && conditions.some((item) => FEMALE_ONLY_CONDITION_IDS.has(item))) {
         const health = await api.setHealth({
-          conditions: conditions.filter((item) => !femaleOnly.has(item)),
+          conditions: conditions.filter((item) => !FEMALE_ONLY_CONDITION_IDS.has(item)),
           trimester: null,
         })
         setConditions(health.conditions || [])
@@ -144,7 +143,7 @@ export default function Goals() {
                     update('sex', sex)
                     if (sex === 'male') {
                       setConditions((current) => current.filter(
-                        (item) => !['pregnancy', 'lactation', 'menstruation', 'menopause'].includes(item),
+                        (item) => !FEMALE_ONLY_CONDITION_IDS.has(item),
                       ))
                     }
                   }}

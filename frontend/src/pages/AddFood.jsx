@@ -3,13 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, macrosFromNutrients } from '../api'
 import BarcodeScanner from '../components/BarcodeScanner'
 import { formatNumber } from '../lib/format'
+import { MEALS, normalizeMeal } from '../lib/meals'
 import { getSpeechRecognition, speechSupported } from '../lib/speech'
-
-const MEALS = ['breakfast', 'lunch', 'dinner']
-
-function normalizeMeal(value) {
-  return MEALS.includes(value) ? value : 'dinner'
-}
 
 export default function AddFood() {
   const navigate = useNavigate()

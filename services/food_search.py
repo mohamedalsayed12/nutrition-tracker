@@ -223,9 +223,3 @@ def popular_logged_foods(user_id, meal=None, limit=12):
         ]
     return ranked
 
-
-def search_exercises(query):
-    """Backward-compatible name list; prefer search_exercise_options."""
-    from services.exercise_ninjas import search_exercise_options
-
-    return [item["name"] for item in search_exercise_options(query)]

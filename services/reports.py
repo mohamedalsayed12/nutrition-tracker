@@ -59,7 +59,8 @@ def daily_report(user_id, day, zone):
         configured_micronutrients(nutrition.age, nutrition.sex, preferences, extra_conditions=day_conditions)
         if nutrition else []
     )
-    micronutrient_progress = remaining_targets(foods, micronutrients)
+    # Attach food advice once via deficiency_advice; keep progress rows lean.
+    micronutrient_progress = remaining_targets(foods, micronutrients, include_food_advice=False)
     return dict(
         date=day.isoformat(),
         timezone=str(zone),

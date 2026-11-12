@@ -20,6 +20,10 @@ export const MEDICAL_CONDITIONS = [
   { id: 'kidney_disease', label: 'Chronic kidney disease', femaleOnly: false, group: 'Nutrient status' },
 ]
 
+export const FEMALE_ONLY_CONDITION_IDS = new Set(
+  MEDICAL_CONDITIONS.filter((item) => item.femaleOnly).map((item) => item.id),
+)
+
 const EXCLUSIVE_PAIRS = [
   ['pregnancy', 'menstruation'],
   ['pregnancy', 'lactation'],
