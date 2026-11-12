@@ -144,6 +144,29 @@ export default function AddFood() {
     }
   }, [chooseFood, meal, navigate])
 
+  const startListening = useCallback((autoLog = false) => {
+    const recognition = getSpeechRecognition()
+    if (!recognition) {
+      setError('Voice logging needs a browser with speech recognition (Chrome works best).')
+      return
+    }
+    setError('')
+    setVoiceNote('')
+    setListening(true)
+    setStatus('Listening… tell me what you ate.')
+    recognition.onresult = (event) => {
+      const heard = event.results?.[0]?.[0]?.transcript || ''
+      setListening(false)
+      applyTranscript(heard, { autoLog })
+    }
+    recognition.onerror = () => {
+      setListening(false)
+      setError('Could not hear that. Try again, or type the food.')
+    }
+    recognition.onend = () => setListening(false)
+    recognition.start()
+  }, [applyTranscript])
+
   useEffect(() => {
     const transcript = params.get('transcript') || params.get('say') || params.get('q')
     const barcode = params.get('barcode')
@@ -159,52 +182,13 @@ export default function AddFood() {
     }
     if (speak) {
       // Defer so the page paints before the mic permission prompt.
-      window.setTimeout(() => {
-        const recognition = getSpeechRecognition()
-        if (!recognition) {
-          setError('Voice logging needs a browser with speech recognition (Chrome works best).')
-          return
-        }
-        setListening(true)
-        setStatus('Listening… tell me what you ate.')
-        recognition.onresult = (event) => {
-          const heard = event.results?.[0]?.[0]?.transcript || ''
-          setListening(false)
-          applyTranscript(heard, { autoLog })
-        }
-        recognition.onerror = () => {
-          setListening(false)
-          setError('Could not hear that. Try again, or type the food.')
-        }
-        recognition.onend = () => setListening(false)
-        recognition.start()
-      }, 250)
+      window.setTimeout(() => startListening(autoLog), 250)
     }
-    // Run once for deep-link / assistant handoff params.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deep-link handoff once on mount
   }, [])
 
-  async function handleVoice() {
-    const recognition = getSpeechRecognition()
-    if (!recognition) {
-      setError('Voice logging needs a browser with speech recognition (Chrome works best).')
-      return
-    }
-    setError('')
-    setVoiceNote('')
-    setListening(true)
-    setStatus('Listening… tell me what you ate.')
-    recognition.onresult = async (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || ''
-      setListening(false)
-      await applyTranscript(transcript)
-    }
-    recognition.onerror = () => {
-      setListening(false)
-      setError('Could not hear that. Try again, or type the food.')
-    }
-    recognition.onend = () => setListening(false)
-    recognition.start()
+  function handleVoice() {
+    startListening(false)
   }
 
   const portion = useMemo(() => {

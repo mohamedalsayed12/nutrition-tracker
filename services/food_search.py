@@ -55,7 +55,6 @@ def _relevance_score(food, query, words, personal_counts=None):
     )
     brand_hit = bool(brand) and any(word in brand for word in words)
     data_rank = DATA_TYPE_RANK.get(food.data_type, 4)
-    # Prefer concise, specific Foundation foods over long branded ingredient lists.
     length_penalty = min(len(_tokens(description)), 20)
     personal_boost = -min(personal_counts.get(food.fdc_id, 0), 50)
 
@@ -65,7 +64,7 @@ def _relevance_score(food, query, words, personal_counts=None):
         0 if phrase else 1,
         -whole_hits,
         -prefix_hits,
-        personal_boost,  # frequently logged foods rise among accurate matches
+        personal_boost,
         0 if brand_hit else 1,
         data_rank if not brand_hit else max(data_rank - 1, 0),
         length_penalty,
@@ -80,7 +79,6 @@ def _rank_foods(foods, query, personal_counts=None):
         foods,
         key=lambda food: _relevance_score(food, normalized, words, personal_counts),
     )
-    # Keep a healthy mix: prefer accurate generic matches, then branded.
     generic = [food for food in ranked if food.data_type != "Branded"]
     branded = [food for food in ranked if food.data_type == "Branded"]
     selected = generic[:12] + branded[:8]
@@ -132,7 +130,6 @@ def _find_foods(client, query, personal_counts=None):
                 if (food.gtin_upc or "").lstrip("0") == query.lstrip("0")][:20]
 
     words = _tokens(query)
-    # Prefer accurate USDA reference foods first, then fill with branded.
     primary = client.search(
         query,
         page_size=50,
@@ -172,8 +169,6 @@ def search_foods(query, user_id=None):
     personal_counts = _user_food_counts(user_id)
     try:
         ordered = _find_foods(get_food_client(), query.lower(), personal_counts)
-        # Put previously logged matches first among equal relevance by re-sorting
-        # with personal counts already baked into relevance.
         return [_serialize_food(food, personal_counts) for food in ordered]
     except Exception:
         abort(502, description="Food search is temporarily unavailable.")
