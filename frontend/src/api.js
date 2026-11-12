@@ -12,6 +12,14 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+export function localTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
+
 async function request(path, { method = 'GET', body, auth = true } = {}) {
   const headers = { 'Content-Type': 'application/json' }
   if (auth) {
@@ -47,8 +55,15 @@ export const api = {
   getNutrition: () => request('/api/v1/goals/nutrition'),
   getMacroSplit: () => request('/api/v1/settings/macro-split'),
 
-  dailyReport: (date) => request(`/api/v1/reports/daily${date ? `?date=${date}` : ''}`),
-  weeklyReport: () => request('/api/v1/reports/weekly'),
+  dailyReport: (date) => {
+    const params = new URLSearchParams({ timezone: localTimeZone() })
+    if (date) params.set('date', date)
+    return request(`/api/v1/reports/daily?${params}`)
+  },
+  weeklyReport: () => {
+    const params = new URLSearchParams({ timezone: localTimeZone() })
+    return request(`/api/v1/reports/weekly?${params}`)
+  },
   foodLogs: () => request('/api/v1/food-logs?per_page=100'),
   createFoodLog: (payload) => request('/api/v1/food-logs', { method: 'POST', body: payload }),
   deleteFoodLog: (id) => request(`/api/v1/food-logs/${id}`, { method: 'DELETE' }),

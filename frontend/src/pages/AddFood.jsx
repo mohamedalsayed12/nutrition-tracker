@@ -165,19 +165,20 @@ export default function AddFood() {
   useEffect(() => {
     const transcript = params.get('transcript') || params.get('say') || params.get('q')
     const barcode = params.get('barcode')
-    const autoLog = params.get('auto_log') === '1' || params.get('autolog') === '1'
     const speak = params.get('speak') === '1'
+    // Deep links only preview. Auto-write stays on authenticated POST /food-logs/from-voice
+    // so a shared ?auto_log=1 URL cannot silently create logs in a signed-in browser.
     if (barcode) {
       lookupBarcode(barcode)
       return
     }
     if (transcript) {
-      applyTranscript(transcript, { autoLog })
+      applyTranscript(transcript, { autoLog: false })
       return
     }
     if (speak) {
       // Defer so the page paints before the mic permission prompt.
-      window.setTimeout(() => startListening(autoLog), 250)
+      window.setTimeout(() => startListening(false), 250)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deep-link handoff once on mount
   }, [])

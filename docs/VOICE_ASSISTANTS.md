@@ -18,15 +18,15 @@ Examples (replace the origin with your deployed frontend):
 
 ```text
 https://YOUR_FRONTEND/app/add?transcript=180%20grams%20of%20chicken%20for%20dinner
-https://YOUR_FRONTEND/app/add?transcript=two%20eggs%20for%20breakfast&auto_log=1
 https://YOUR_FRONTEND/app/add?speak=1
 https://YOUR_FRONTEND/app/add?barcode=012345678905
 ```
 
-- `transcript` / `say` / `q` — parse the sentence, fill grams + meal, suggest a USDA match  
-- `auto_log=1` — parse **and** create the food log immediately, then return to Today  
+- `transcript` / `say` / `q` — parse the sentence, fill grams + meal, suggest a USDA match (preview only; tap Add to save)  
 - `speak=1` — open Add food and start the microphone  
 - `barcode=` — look up a packaged product  
+
+Deep links never auto-write food logs (avoids silent writes from a shared URL in a signed-in browser). For hands-free logging, use the authenticated `POST /api/v1/food-logs/from-voice` API below.
 
 ## One-shot API for assistants
 
@@ -73,10 +73,10 @@ Then: **“Hey Siri, log my food”** → speak *“two eggs for breakfast”* �
 Do not paste a long-lived password into a shortcut if you can avoid it. Prefer:
 
 - a short-lived access token you refresh occasionally, or  
-- opening the deep link instead of calling the API directly:
+- opening a preview deep link, then confirming Add in the app:
 
 **Open URLs** →  
-`https://YOUR_FRONTEND/app/add?transcript=DICTIONATED_TEXT&auto_log=1`  
+`https://YOUR_FRONTEND/app/add?transcript=DICTIONATED_TEXT`  
 (user must already be signed in on that device browser / PWA).
 
 ### Fully native Siri (later)
@@ -89,7 +89,7 @@ A Capacitor / React Native / Swift wrapper can expose **App Intents** so Siri un
 2. Trigger phrase: e.g. **“log my food”**.
 3. Action options:
    - **Open URL / browse**:  
-     `https://YOUR_FRONTEND/app/add?speak=1` or with `transcript=...&auto_log=1`
+     `https://YOUR_FRONTEND/app/add?speak=1` or `transcript=...` (preview; tap Add to save)
    - Or **HTTP Request** (via Tasker / HTTP Shortcut apps) to  
      `POST /api/v1/food-logs/from-voice` with the bearer token
 
@@ -107,5 +107,5 @@ Assistant App Actions inside a Play Store app are the native equivalent of iOS A
 ## Security notes
 
 - Treat bearer tokens in Shortcuts like passwords.
-- `auto_log=true` will write a food log as soon as the best USDA match is found — good for Siri, so keep phrases specific (“chicken breast 180 grams”, not just “food”).
+- API `auto_log=true` writes a food log as soon as the best USDA match is found — keep phrases specific (“chicken breast 180 grams”, not just “food”). Browser deep links only preview.
 - Rotate tokens if a phone is shared or lost.

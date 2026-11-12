@@ -15,7 +15,7 @@ const INITIAL = {
   intensity: 'medium',
   weight_kg: 70,
   height_cm: 170,
-  extra: true,
+  extra: false,
 }
 
 export default function AddExercise() {

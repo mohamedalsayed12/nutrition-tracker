@@ -23,6 +23,8 @@ def validate_day_conditions(user_id, conditions):
     preference_conditions = set(preferences.conditions or []) if preferences else set()
     if "menstruation" in conditions and "pregnancy" in preference_conditions:
         raise ValueError("Pregnancy and menstruation cannot both be active.")
+    if "menstruation" in conditions and "lactation" in preference_conditions:
+        raise ValueError("Lactation and menstruation cannot both be active.")
     if "pregnancy" in conditions:
         raise ValueError("Log pregnancy in health settings, not as a day condition.")
     return conditions

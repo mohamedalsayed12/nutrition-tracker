@@ -100,11 +100,14 @@ export default function Goals() {
         goal: form.goal,
       }
       const result = await api.setNutrition(payload)
-      await api.setMacroSplit({
-        carbs_percent: 45,
-        protein_percent: 25,
-        fat_percent: 30,
-      })
+      const existingSplit = await api.getMacroSplit().catch(() => ({ configured: false }))
+      if (!existingSplit.configured) {
+        await api.setMacroSplit({
+          carbs_percent: 45,
+          protein_percent: 25,
+          fat_percent: 30,
+        })
+      }
       // Drop sex-incompatible conditions after a sex change.
       if (form.sex === 'male' && conditions.some((item) => FEMALE_ONLY_CONDITION_IDS.has(item))) {
         const health = await api.setHealth({
